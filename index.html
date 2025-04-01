@@ -299,12 +299,12 @@
                         const deliveryDetails = order.deliveryDetails || {};
                         output += `
                             <div class="order-card">
-                                <p><strong>ID:</strong> ${order.id}</p>
+                                 <p><strong>Items:</strong> ${items}</p>
+                                 <p><strong>Location:</strong> ${deliveryDetails.location || "N/A"}</p>
+                                  <p><strong>Contact:</strong> ${deliveryDetails.contactNumber || "N/A"}</p>
+                                 <p><strong>Total:</strong> GH₵${subtotal.toFixed(2)}</p>
+                                  <p><strong>ID:</strong> ${order.id}</p>
                                 <p><strong>Time:</strong> ${new Date(order.timestamp).toLocaleString()}</p>
-                                <p><strong>Items:</strong> ${items}</p>
-                                <p><strong>Total:</strong> GH₵${subtotal.toFixed(2)}</p>
-                                <p><strong>Location:</strong> ${deliveryDetails.location || "N/A"}</p>
-                                <p><strong>Contact:</strong> ${deliveryDetails.contactNumber || "N/A"}</p>
                                 <p><strong>Note:</strong> ${deliveryDetails.deliveryNotes || "None"}</p>
                                 <p><strong>Status:</strong> <span class="status">In Transit</span></p>
                                 <div class="flex gap-4 mt-6">
