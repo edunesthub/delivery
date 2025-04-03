@@ -107,7 +107,6 @@
             font-size: 1.1rem;
             width: 100%;
             max-width: 300px;
-            margin-left: 20px;
         }
         .btn-edit {
             background: #34c759;
@@ -305,7 +304,13 @@
     </style>
 </head>
 <body>
-    <div id="login-section" class="section">
+    <!-- Loading screen with "Chawp" centered -->
+    <div id="loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1c1c1e; display: flex; align-items: center; justify-content: center; z-index: 3000;">
+        <h1 style="font-size: 3rem; font-weight: 600; letter-spacing: -2px; background: linear-gradient(45deg, #007aff, #34c759, #007aff); -webkit-background-clip: text; background-clip: text; color: transparent;">Chawp</h1>
+    </div>
+
+    <!-- Login section (hidden by default) -->
+    <div id="login-section" class="section" style="display: none;">
         <div class="login-container">
             <h1>Delivery Portal</h1>
             <input type="email" id="email" placeholder="Email" class="input">
@@ -314,6 +319,7 @@
         </div>
     </div>
 
+    <!-- Main content (hidden until auth resolves) -->
     <div id="main-content" class="container hidden">
         <div class="header">
             <h1>Chawp Delivery</h1>
@@ -345,254 +351,204 @@
         </div>
     </div>
 
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-        import { 
-            getFirestore, collection, query, where, onSnapshot, doc, updateDoc, getDoc
-        } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
-        import { 
-            getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+import { 
+    getFirestore, collection, query, where, onSnapshot, doc, updateDoc, getDoc
+} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { 
+    getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyADvpUQWo75ExePGoCRirD2mM-lmfM4Cmc",
-            authDomain: "von600-7982d.firebaseapp.com",
-            projectId: "von600-7982d",
-            storageBucket: "von600-7982d.appspot.com",
-            messagingSenderId: "164591218045",
-            appId: "1:164591218045:web:afe17512e16573e7903014",
-            measurementId: "G-E69DMPLXBK"
-        };
+// Firebase config (unchanged)
+const firebaseConfig = {
+    apiKey: "AIzaSyADvpUQWo75ExePGoCRirD2mM-lmfM4Cmc",
+    authDomain: "von600-7982d.firebaseapp.com",
+    projectId: "von600-7982d",
+    storageBucket: "von600-7982d.appspot.com",
+    messagingSenderId: "164591218045",
+    appId: "1:164591218045:web:afe17512e16573e7903014",
+    measurementId: "G-E69DMPLXBK"
+};
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        let restaurantId = null;
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+let restaurantId = null;
 
-        function showNotification(message, type = "success") {
-            const notification = document.getElementById("notification");
-            notification.textContent = message;
-            notification.className = `notification ${type === "error" ? "error" : ""}`;
-            notification.classList.add("show");
-            setTimeout(() => notification.classList.remove("show"), 3000);
+// Cache DOM elements
+const loadingScreen = document.getElementById("loading-screen");
+const loginSection = document.getElementById("login-section");
+const mainContent = document.getElementById("main-content");
+const notification = document.getElementById("notification");
+const deliveryList = document.getElementById("delivery-list");
+const deliveredList = document.getElementById("delivered-list");
+
+// Fast notification function
+function showNotification(message, type = "success") {
+    notification.textContent = message;
+    notification.className = `notification ${type === "error" ? "error" : ""} show`;
+    setTimeout(() => notification.classList.remove("show"), 3000);
+}
+
+// Efficient section toggling
+function toggleSection(sectionId) {
+    const sections = { delivery: deliveryList, delivered: deliveredList, settings: null };
+    Object.keys(sections).forEach(id => {
+        const section = document.getElementById(id);
+        section.classList.toggle("hidden", id !== sectionId);
+        document.getElementById(`${id}-btn`).classList.toggle("active", id === sectionId);
+    });
+}
+
+// Optimized order loading
+function loadOrders(statusFilter, targetElement, emptyMessage) {
+    if (!restaurantId) return;
+    const q = query(collection(db, "orders"), where("restaurantId", "==", restaurantId));
+    onSnapshot(q, (snapshot) => {
+        const orders = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(order => statusFilter(order.status))
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        if (!orders.length) {
+            targetElement.innerHTML = `<p class='text-gray-400'>${emptyMessage}</p>`;
+            return;
         }
 
-        function toggleSection(sectionId) {
-            const sections = ["delivery", "delivered", "settings"];
-            sections.forEach(id => {
-                document.getElementById(id).classList.toggle("hidden", id !== sectionId);
-            });
-            const buttons = document.querySelectorAll(".footer-nav button");
-            buttons.forEach(btn => {
-                btn.classList.toggle("active", btn.id === `${sectionId}-btn`);
-            });
+        const fragment = document.createDocumentFragment();
+        orders.forEach(order => {
+            const items = order.items.map(item => `${item.quantity}x ${item.name}`).join(", ");
+            const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+            const deliveryDetails = order.deliveryDetails || {};
+            const statusText = order.status === "delivered" ? "Delivered" : order.status === "not_delivered" ? "Not Delivered" : "In Transit";
+            const statusClass = order.status === "delivered" ? "status" : order.status === "not_delivered" ? "status not-delivered" : "status";
+            
+            const card = document.createElement("div");
+            card.className = "order-card";
+            card.innerHTML = `
+                ${order.status === "being_delivered" ? "" : `<p><strong>ID:</strong> ${order.id}</p>`}
+                <p><strong>Time:</strong> ${new Date(order.timestamp).toLocaleString()}</p>
+                <p><strong>Items:</strong> ${items}</p>
+                <p><strong>Total:</strong> GH₵${subtotal.toFixed(2)}</p>
+                <p><strong>Location:</strong> ${deliveryDetails.location || "N/A"}</p>
+                <p><strong>Contact:</strong> ${deliveryDetails.contactNumber || "N/A"}</p>
+                <p><strong>Note:</strong> ${deliveryDetails.deliveryNotes || "None"}</p>
+                <p><strong>Status:</strong> <span class="${statusClass}">${statusText}</span></p>
+                ${order.status === "being_delivered" ? `
+                    <div class="flex gap-4 mt-6">
+                        <button class="btn btn-edit delivered-btn" data-order-id="${order.id}">Delivered</button>
+                        <button class="btn btn-secondary not-delivered-btn" data-order-id="${order.id}">Not Delivered</button>
+                    </div>
+                ` : ""}
+            `;
+            fragment.appendChild(card);
+        });
+
+        targetElement.innerHTML = "";
+        targetElement.appendChild(fragment);
+
+        if (statusFilter === (s => s === "being_delivered")) {
+            targetElement.querySelectorAll(".delivered-btn").forEach(btn => 
+                btn.addEventListener("click", () => markOrderAsDelivered(btn.dataset.orderId))
+            );
+            targetElement.querySelectorAll(".not-delivered-btn").forEach(btn => 
+                btn.addEventListener("click", () => markOrderAsNotDelivered(btn.dataset.orderId))
+            );
         }
+    }, (error) => {
+        showNotification("Error loading data!", "error");
+        targetElement.innerHTML = `<p class='text-gray-400'>Error loading data.</p>`;
+    });
+}
 
-        function loadDeliveryOrders() {
-            if (!restaurantId) return;
-            const deliveryList = document.getElementById("delivery-list");
-            const q = query(collection(db, "orders"), where("restaurantId", "==", restaurantId));
-            onSnapshot(q, (snapshot) => {
-                if (snapshot.empty) {
-                    deliveryList.innerHTML = "<p class='text-gray-400'>No active deliveries.</p>";
-                    return;
-                }
-                const orders = [];
-                snapshot.forEach(doc => {
-                    orders.push({ id: doc.id, ...doc.data() });
-                });
-                orders.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                let output = "";
-                orders.forEach(order => {
-                    if (order.status === "being_delivered") {
-                        const items = order.items.map(item => `${item.quantity}x ${item.name}`).join(", ");
-                        const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-                        const deliveryDetails = order.deliveryDetails || {};
-                        output += `
-                            <div class="order-card">
-                                <p><strong>Items:</strong> ${items}</p>
-                                <p><strong>Location:</strong> ${deliveryDetails.location || "N/A"}</p>
-                                <p><strong>Contact:</strong> ${deliveryDetails.contactNumber || "N/A"}</p>
-                                <p><strong>Total:</strong> GH₵${subtotal.toFixed(2)}</p>
-                                <p><strong>ID:</strong> ${order.id}</p>
-                                <p><strong>Time:</strong> ${new Date(order.timestamp).toLocaleString()}</p>
-                                <p><strong>Note:</strong> ${deliveryDetails.deliveryNotes || "None"}</p>
-                                <p><strong>Status:</strong> <span class="status">In Transit</span></p>
-                                <div class="flex gap-4 mt-6">
-                                    <button class="btn btn-edit delivered-btn" data-order-id="${order.id}">Delivered</button>
-                                    <button class="btn btn-secondary not-delivered-btn" data-order-id="${order.id}">Not Delivered</button>
-                                </div>
-                            </div>
-                        `;
-                    }
-                });
-                deliveryList.innerHTML = output || "<p class='text-gray-400'>No active deliveries.</p>";
-                deliveryList.querySelectorAll(".delivered-btn").forEach(btn => {
-                    btn.addEventListener("click", () => markOrderAsDelivered(btn.dataset.orderId));
-                });
-                deliveryList.querySelectorAll(".not-delivered-btn").forEach(btn => {
-                    btn.addEventListener("click", () => markOrderAsNotDelivered(btn.dataset.orderId));
-                });
-            }, (error) => {
-                showNotification("Error loading deliveries!", "error");
-                console.error("Error in loadDeliveryOrders:", error);
-                deliveryList.innerHTML = "<p class='text-gray-400'>Error loading deliveries.</p>";
-            });
+// Fast status updates
+async function markOrderAsDelivered(orderId) {
+    try {
+        await updateDoc(doc(db, "orders", orderId), { status: "delivered" });
+        showNotification("Order marked as delivered!");
+    } catch (error) {
+        showNotification("Error updating status!", "error");
+    }
+}
+
+async function markOrderAsNotDelivered(orderId) {
+    try {
+        await updateDoc(doc(db, "orders", orderId), { status: "not_delivered" });
+        showNotification("Order marked as not delivered!");
+    } catch (error) {
+        showNotification("Error updating status!", "error");
+    }
+}
+
+// Immediate auth check with loading screen
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        const mappingRef = doc(db, "vendorMappings", user.email);
+        const mappingSnap = await getDoc(mappingRef);
+        if (mappingSnap.exists()) {
+            restaurantId = mappingSnap.data().restaurantId;
+            loadingScreen.style.display = "none"; // Hide loading screen
+            loginSection.style.display = "none";
+            mainContent.classList.remove("hidden");
+            loadOrders(s => s === "being_delivered", deliveryList, "No active deliveries.");
+            loadOrders(s => s === "delivered" || s === "not_delivered", deliveredList, "No completed deliveries.");
+        } else {
+            signOut(auth);
+            loadingScreen.style.display = "none";
+            loginSection.style.display = "flex";
+            mainContent.classList.add("hidden");
+            showNotification("No restaurant assigned to this email!", "error");
         }
+    } else {
+        loadingScreen.style.display = "none";
+        loginSection.style.display = "flex";
+        mainContent.classList.add("hidden");
+        restaurantId = null;
+    }
+});
 
-        function loadDeliveredOrders() {
-            if (!restaurantId) return;
-            const deliveredList = document.getElementById("delivered-list");
-            const q = query(collection(db, "orders"), where("restaurantId", "==", restaurantId));
-            onSnapshot(q, (snapshot) => {
-                if (snapshot.empty) {
-                    deliveredList.innerHTML = "<p class='text-gray-400'>No completed deliveries.</p>";
-                    return;
-                }
-                const orders = [];
-                snapshot.forEach(doc => {
-                    orders.push({ id: doc.id, ...doc.data() });
-                });
-                orders.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                let output = "";
-                orders.forEach(order => {
-                    if (order.status === "delivered" || order.status === "not_delivered") {
-                        const items = order.items.map(item => `${item.quantity}x ${item.name}`).join(", ");
-                        const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-                        const deliveryDetails = order.deliveryDetails || {};
-                        const statusText = order.status === "delivered" ? "Delivered" : "Not Delivered";
-                        const statusClass = order.status === "delivered" ? "status" : "status not-delivered";
-                        output += `
-                            <div class="order-card">
-                                <p><strong>ID:</strong> ${order.id}</p>
-                                <p><strong>Time:</strong> ${new Date(order.timestamp).toLocaleString()}</p>
-                                <p><strong>Items:</strong> ${items}</p>
-                                <p><strong>Total:</strong> GH₵${subtotal.toFixed(2)}</p>
-                                <p><strong>Location:</strong> ${deliveryDetails.location || "N/A"}</p>
-                                <p><strong>Contact:</strong> ${deliveryDetails.contactNumber || "N/A"}</p>
-                                <p><strong>Note:</strong> ${deliveryDetails.deliveryNotes || "None"}</p>
-                                <p><strong>Status:</strong> <span class="${statusClass}">${statusText}</span></p>
-                            </div>
-                        `;
-                    }
-                });
-                deliveredList.innerHTML = output || "<p class='text-gray-400'>No completed deliveries.</p>";
-            }, (error) => {
-                showNotification("Error loading status!", "error");
-                console.error("Error in loadDeliveredOrders:", error);
-                deliveredList.innerHTML = "<p class='text-gray-400'>Error loading status.</p>";
-            });
+// Login handler
+document.getElementById("login-btn").addEventListener("click", async () => {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const mappingRef = doc(db, "vendorMappings", userCredential.user.email);
+        const mappingSnap = await getDoc(mappingRef);
+        if (mappingSnap.exists()) {
+            restaurantId = mappingSnap.data().restaurantId;
+            loadingScreen.style.display = "none";
+            loginSection.style.display = "none";
+            mainContent.classList.remove("hidden");
+            loadOrders(s => s === "being_delivered", deliveryList, "No active deliveries.");
+            loadOrders(s => s === "delivered" || s === "not_delivered", deliveredList, "No completed deliveries.");
+        } else {
+            signOut(auth);
+            showNotification("No restaurant assigned to this email!", "error");
         }
+    } catch (error) {
+        showNotification("Login failed: " + error.message, "error");
+    }
+});
 
-        async function markOrderAsDelivered(orderId) {
-            try {
-                const orderRef = doc(db, "orders", orderId);
-                await updateDoc(orderRef, { status: "delivered" });
-                showNotification("Order marked as delivered!");
-            } catch (error) {
-                showNotification("Error updating status!", "error");
-                console.error("Error in markOrderAsDelivered:", error);
-            }
-        }
+// Logout handler
+document.getElementById("logout-btn").addEventListener("click", async () => {
+    await signOut(auth);
+    showNotification("Logged out successfully!");
+});
 
-        async function markOrderAsNotDelivered(orderId) {
-            try {
-                const orderRef = doc(db, "orders", orderId);
-                await updateDoc(orderRef, { status: "not_delivered" });
-                showNotification("Order marked as not delivered!");
-            } catch (error) {
-                showNotification("Error updating status!", "error");
-                console.error("Error in markOrderAsNotDelivered:", error);
-            }
-        }
+// Navigation handlers
+document.getElementById("delivery-btn").addEventListener("click", () => toggleSection("delivery"));
+document.getElementById("delivered-btn").addEventListener("click", () => toggleSection("delivered"));
+document.getElementById("settings-btn").addEventListener("click", () => toggleSection("settings"));
 
-        // Authentication Logic
-        document.getElementById("login-btn").addEventListener("click", async () => {
-            const email = document.getElementById("email").value;
-            const password = document.getElementById("password").value;
-            try {
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                const user = userCredential.user;
-                const mappingRef = doc(db, "vendorMappings", user.email);
-                const mappingSnap = await getDoc(mappingRef);
-                if (mappingSnap.exists()) {
-                    restaurantId = mappingSnap.data().restaurantId;
-                    document.getElementById("login-section").classList.add("hidden");
-                    document.getElementById("main-content").classList.remove("hidden");
-                    loadDeliveryOrders();
-                    loadDeliveredOrders();
-                } else {
-                    showNotification("No restaurant assigned to this email!", "error");
-                    signOut(auth);
-                }
-            } catch (error) {
-                showNotification("Login failed: " + error.message, "error");
-                console.error("Error in login:", error);
-            }
-        });
-
-        document.getElementById("logout-btn").addEventListener("click", async () => {
-            try {
-                await signOut(auth);
-                document.getElementById("main-content").classList.add("hidden");
-                document.getElementById("login-section").classList.remove("hidden");
-                restaurantId = null;
-                showNotification("Logged out successfully!");
-            } catch (error) {
-                showNotification("Error logging out!", "error");
-                console.error("Error in logout:", error);
-            }
-        });
-
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                const mappingRef = doc(db, "vendorMappings", user.email);
-                const mappingSnap = await getDoc(mappingRef);
-                if (mappingSnap.exists()) {
-                    restaurantId = mappingSnap.data().restaurantId;
-                    document.getElementById("login-section").classList.add("hidden");
-                    document.getElementById("main-content").classList.remove("hidden");
-                    loadDeliveryOrders();
-                    loadDeliveredOrders();
-                } else {
-                    signOut(auth);
-                    showNotification("No restaurant assigned to this email!", "error");
-                }
-            } else {
-                document.getElementById("main-content").classList.add("hidden");
-                document.getElementById("login-section").classList.remove("hidden");
-                restaurantId = null;
-            }
-        });
-
-        document.getElementById("delivery-btn").addEventListener("click", () => {
-            toggleSection("delivery");
-            loadDeliveryOrders();
-        });
-        document.getElementById("delivered-btn").addEventListener("click", () => {
-            toggleSection("delivered");
-            loadDeliveredOrders();
-        });
-        document.getElementById("settings-btn").addEventListener("click", () => {
-            toggleSection("settings");
-        });
-
-        document.addEventListener("DOMContentLoaded", () => {
-            // Initial load depends on auth state
-        });
-    </script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then((registration) => {
-                        console.log('Service Worker registered with scope:', registration.scope);
-                    })
-                    .catch((error) => {
-                        console.error('Service Worker registration failed:', error);
-                    });
-            });
-        }
+// Ensure loading screen is visible until auth resolves
+document.addEventListener("DOMContentLoaded", () => {
+    // Loading screen is already visible by default via inline style
+});
     </script>
 </body>
 </html>
