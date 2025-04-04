@@ -2,7 +2,7 @@
     "name": " Chawp Delivery Hub",
     "short_name": "Chawp Delivery",
     "description": "Your command center for seamless deliveries",
-    "start_url": "/index.html",
+    "start_url": "https://delivery.chawp.me/index.html",
     "display": "standalone",
     "background_color": "#1c1c1e",
     "theme_color": "#1c1c1e",
