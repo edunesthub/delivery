@@ -107,6 +107,15 @@
             font-size: 1.1rem;
             width: 100%;
             max-width: 300px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
         }
         .btn-edit {
             background: #34c759;
@@ -123,17 +132,30 @@
             padding: 16px 32px;
             border-radius: 14px;
             box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
-            z-index: 1000;
+            z-index: 3000;
             opacity: 0;
-            transition: opacity 0.3s ease;
+            transition: all 0.3s ease;
             font-weight: 500;
             font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 90%;
+            width: auto;
+            pointer-events: none;
         }
         .notification.show {
             opacity: 1;
+            transform: translateX(-50%) translateY(0);
         }
         .notification.error {
             background: #ff3b30;
+        }
+        .notification.warning {
+            background: #ff9500;
+        }
+        .notification i {
+            font-size: 1.2rem;
         }
         .footer-nav {
             position: fixed;
@@ -216,6 +238,7 @@
             max-width: 400px;
             z-index: 1;
             animation: fadeIn 0.5s ease;
+            position: relative;
         }
         #login-section h1 {
             font-size: clamp(1.5rem, 5vw, 2.5rem);
@@ -227,6 +250,10 @@
             background-clip: text;
             color: transparent;
         }
+        .input-group {
+            position: relative;
+            margin-bottom: 15px;
+        }
         .input {
             background: #343436;
             border: none;
@@ -237,12 +264,54 @@
             margin-bottom: 15px;
             font-size: clamp(0.875rem, 2.5vw, 1rem);
             box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
-            transition: background 0.2s ease, transform 0.2s ease;
+            transition: all 0.2s ease;
+            padding-right: 40px;
         }
         .input:focus {
             background: #3a3a3c;
             outline: none;
             transform: scale(1.02);
+            box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3);
+        }
+        .input.error {
+            border: 1px solid #ff3b30;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 14px;
+            top: 14px;
+            background: none;
+            border: none;
+            color: #a1a1a6;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        .password-toggle:hover {
+            color: #fff;
+        }
+        .error-message {
+            color: #ff3b30;
+            font-size: 0.875rem;
+            margin-top: 5px;
+            display: none;
+        }
+        .error-message.show {
+            display: block;
+        }
+        .loading-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        .loading-spinner.show {
+            display: block;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
         #login-section.hidden {
             display: none;
@@ -296,7 +365,7 @@
             .subtitle { font-size: 1rem; }
             h2 { font-size: 3rem; }
             .order-card p { font-size: 1rem; }
-            .btn { padding: 10px 20px; font-size: 0.95rem; }
+            .btn { padding: 12px 24px; font-size: 1rem; }
             .footer-nav {
                 padding: 6px;
                 gap: 6px;
@@ -314,6 +383,16 @@
             #login-section .login-container {
                 padding: 20px;
                 max-width: 90%;
+                margin: 0 auto;
+            }
+            .input {
+                padding: 12px;
+                font-size: 16px;
+            }
+            .notification {
+                font-size: 0.9rem;
+                padding: 12px 24px;
+                width: 90%;
             }
         }
         @keyframes fadeIn {
@@ -333,13 +412,30 @@
         <h1 style="font-size: 3rem; font-weight: 600; letter-spacing: -2px; background: linear-gradient(45deg, #007aff, #34c759, #007aff); -webkit-background-clip: text; background-clip: text; color: transparent;">Chawp</h1>
     </div>
 
+    <!-- Notification element added to ensure it exists and is positioned correctly -->
+    <div id="notification" class="notification" style="z-index: 3000;"></div>
+
     <!-- Login section (hidden by default) -->
     <div id="login-section" class="section" style="display: none;">
         <div class="login-container">
             <h1>Delivery Portal</h1>
-            <input type="email" id="email" placeholder="Email" class="input">
-            <input type="password" id="password" placeholder="Password" class="input">
-            <button id="login-btn" class="btn">Login</button>
+            <form id="login-form">
+                <div class="input-group">
+                    <input type="email" id="email" placeholder="Email" class="input" required aria-label="Email address" autocomplete="email">
+                    <div class="error-message" id="email-error"></div>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="password" placeholder="Password" class="input" required minlength="6" aria-label="Password" autocomplete="current-password">
+                    <button type="button" class="password-toggle" aria-label="Toggle password visibility">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <div class="error-message" id="password-error"></div>
+                </div>
+                <button type="submit" id="login-btn" class="btn">
+                    <span>Login</span>
+                    <div class="loading-spinner"></div>
+                </button>
+            </form>
         </div>
     </div>
 
@@ -354,7 +450,7 @@
 
         <!-- Dashboard Section -->
         <div id="dashboard" class="section">
-            <h2>Today’s Dashboard</h2><br>
+            <h2>Today's Dashboard</h2><br>
             <div class="dashboard-grid" id="dashboard-grid"></div>
         </div>
 
@@ -415,11 +511,38 @@
         const deliveryList = document.getElementById("delivery-list");
         const deliveredList = document.getElementById("delivered-list");
 
-        // Fast notification function
-        function showNotification(message, type = "success") {
-            notification.textContent = message;
-            notification.className = `notification ${type === "error" ? "error" : ""} show`;
-            setTimeout(() => notification.classList.remove("show"), 3000);
+        // Enhanced notification function with improved visibility
+        function showNotification(message, type = "success", icon = "check-circle") {
+            console.log("Showing notification:", message, type); // Debug log
+            
+            // Get or create notification element
+            let notification = document.getElementById("notification");
+            
+            if (!notification) {
+                notification = document.createElement("div");
+                notification.id = "notification";
+                notification.className = "notification";
+                document.body.appendChild(notification);
+                console.log("Created new notification element");
+            }
+            
+            // Set content and show
+            notification.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
+            notification.className = `notification ${type} show`;
+            
+            // Force repaint to ensure animation works
+            notification.offsetHeight;
+            
+            // Clear any existing timeout
+            if (window.notificationTimeout) {
+                clearTimeout(window.notificationTimeout);
+            }
+            
+            // Set new timeout
+            window.notificationTimeout = setTimeout(() => {
+                notification.classList.remove("show");
+                console.log("Hiding notification");
+            }, 4000);
         }
 
         // Efficient section toggling
@@ -539,10 +662,10 @@
             try {
                 const orderRef = doc(db, "orders", orderId);
                 await updateDoc(orderRef, { status: "delivered" });
-                showNotification("Order marked as delivered!");
+                showNotification("Great job! Order marked as delivered");
             } catch (error) {
                 console.error("Error updating status:", error);
-                showNotification("Error updating status!", "error");
+                showNotification("Couldn't update the status right now", "error");
             }
         }
 
@@ -550,10 +673,10 @@
             try {
                 const orderRef = doc(db, "orders", orderId);
                 await updateDoc(orderRef, { status: "not_delivered" });
-                showNotification("Order marked as not delivered!");
+                showNotification("Order marked as not delivered");
             } catch (error) {
                 console.error("Error updating status:", error);
-                showNotification("Error updating status!", "error");
+                showNotification("Couldn't update the status right now", "error");
             }
         }
 
@@ -597,14 +720,73 @@
             }
         });
 
-        // Login handler
-        document.getElementById("login-btn").addEventListener("click", async () => {
+        // Login handler with enhanced validation
+        document.getElementById("login-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
             const email = document.getElementById("email").value;
             const password = document.getElementById("password").value;
+            const emailError = document.getElementById("email-error");
+            const passwordError = document.getElementById("password-error");
+            const loginBtn = document.getElementById("login-btn");
+            const spinner = loginBtn.querySelector(".loading-spinner");
+            const btnText = loginBtn.querySelector("span");
+            
+            console.log("Login attempt with email:", email); // Debug log
+            
+            // Reset error states
+            emailError.classList.remove("show");
+            passwordError.classList.remove("show");
+            document.getElementById("email").classList.remove("error");
+            document.getElementById("password").classList.remove("error");
+            
+            // Validate email
+            if (!email) {
+                emailError.textContent = "Please enter your email";
+                emailError.classList.add("show");
+                document.getElementById("email").classList.add("error");
+                showNotification("Please enter your email address", "error", "envelope");
+                return;
+            }
+            
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                emailError.textContent = "This email address doesn't look right";
+                emailError.classList.add("show");
+                document.getElementById("email").classList.add("error");
+                showNotification("Hmm, that doesn't look like a valid email", "error", "envelope");
+                return;
+            }
+            
+            // Validate password
+            if (!password) {
+                passwordError.textContent = "Please enter your password";
+                passwordError.classList.add("show");
+                document.getElementById("password").classList.add("error");
+                showNotification("Don't forget your password!", "error", "lock");
+                return;
+            }
+            
+            if (password.length < 6) {
+                passwordError.textContent = "Your password needs to be at least 6 characters";
+                passwordError.classList.add("show");
+                document.getElementById("password").classList.add("error");
+                showNotification("Your password is too short", "error", "lock");
+                return;
+            }
+            
+            // Show loading state
+            loginBtn.disabled = true;
+            btnText.textContent = "Logging in...";
+            spinner.classList.add("show");
+            
             try {
+                // Simulate wrong password for testing - COMMENT OUT FOR PRODUCTION
+                // throw { code: "auth/wrong-password" };
+                
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
                 const mappingRef = doc(db, "vendorMappings", userCredential.user.email);
                 const mappingSnap = await getDoc(mappingRef);
+                
                 if (mappingSnap.exists()) {
                     restaurantId = mappingSnap.data().restaurantId;
                     loadingScreen.style.display = "none";
@@ -613,19 +795,87 @@
                     loadDashboard();
                     loadOrders(s => s === "being_delivered", deliveryList, "No active deliveries.");
                     loadOrders(s => s === "delivered" || s === "not_delivered", deliveredList, "No completed deliveries.");
+                    showNotification("Welcome back! You're logged in", "success", "check-circle");
                 } else {
-                    signOut(auth);
-                    showNotification("No restaurant assigned to this email!", "error");
+                    await signOut(auth);
+                    showNotification("This email isn't linked to any restaurant", "error", "exclamation-triangle");
                 }
             } catch (error) {
-                showNotification("Login failed: " + error.message, "error");
+                console.error("Login error:", error.code, error.message); // Debug log
+                
+                let errorMessage = "Something went wrong. Let's try again.";
+                let icon = "exclamation-circle";
+                
+                switch (error.code) {
+                    case "auth/user-not-found":
+                        errorMessage = "We couldn't find an account with this email";
+                        icon = "user-times";
+                        break;
+                    case "auth/wrong-password":
+                        errorMessage = "Oops! That password doesn't match our records";
+                        icon = "lock";
+                        break;
+                    case "auth/too-many-requests":
+                        errorMessage = "Too many attempts. Please take a short break and try again";
+                        icon = "clock";
+                        break;
+                    case "auth/network-request-failed":
+                        errorMessage = "Can't connect right now. Check your internet connection";
+                        icon = "wifi";
+                        break;
+                    default:
+                        errorMessage = "Wrong password or email. Please try again.";
+                        break;
+                }
+                
+                showNotification(errorMessage, "error", icon);
+                document.getElementById("password").value = "";
+                document.getElementById("password").focus();
+            } finally {
+                loginBtn.disabled = false;
+                btnText.textContent = "Login";
+                spinner.classList.remove("show");
+            }
+        });
+
+        // Password visibility toggle
+        document.querySelector(".password-toggle").addEventListener("click", function() {
+            const passwordInput = document.getElementById("password");
+            const icon = this.querySelector("i");
+            
+            if (passwordInput.type === "password") {
+                passwordInput.type = "text";
+                icon.classList.remove("fa-eye");
+                icon.classList.add("fa-eye-slash");
+            } else {
+                passwordInput.type = "password";
+                icon.classList.remove("fa-eye-slash");
+                icon.classList.add("fa-eye");
+            }
+        });
+
+        // Auto-focus email field when login section is shown
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === "style" && loginSection.style.display === "flex") {
+                    document.getElementById("email").focus();
+                }
+            });
+        });
+        
+        observer.observe(loginSection, { attributes: true });
+
+        // Handle Enter key for login
+        document.getElementById("password").addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+                document.getElementById("login-form").dispatchEvent(new Event("submit"));
             }
         });
 
         // Logout handler
         document.getElementById("logout-btn").addEventListener("click", async () => {
             await signOut(auth);
-            showNotification("Logged out successfully!");
+            showNotification("You've been logged out. See you soon!");
         });
 
         // Navigation handlers
