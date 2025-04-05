@@ -404,6 +404,41 @@
             50% { transform: scale(1.2); opacity: 0.3; }
             100% { transform: scale(1); opacity: 0.5; }
         }
+        /* Login notification styles */
+        .login-notification {
+            background: #ff3b30;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            max-width: 100%;
+            text-align: left;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        .login-notification.success {
+            background: #34c759;
+        }
+        .login-notification.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .login-notification i {
+            font-size: 1.1rem;
+        }
+        @media (max-width: 480px) {
+            .login-notification {
+                font-size: 0.9rem;
+                padding: 10px 16px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -419,6 +454,10 @@
     <div id="login-section" class="section" style="display: none;">
         <div class="login-container">
             <h1>Delivery Portal</h1>
+            <div id="login-notification" class="login-notification">
+                <i class="fas fa-exclamation-circle"></i>
+                <span id="login-notification-message">Error message will appear here</span>
+            </div>
             <form id="login-form">
                 <div class="input-group">
                     <input type="email" id="email" placeholder="Email" class="input" required aria-label="Email address" autocomplete="email">
@@ -720,6 +759,33 @@
             }
         });
 
+        // Show login notification specifically in the login form
+        function showLoginNotification(message, type = "error", icon = "exclamation-circle") {
+            console.log("Showing login notification:", message, type);
+            
+            const loginNotification = document.getElementById("login-notification");
+            const messageElement = document.getElementById("login-notification-message");
+            
+            if (loginNotification && messageElement) {
+                // Update icon and message
+                loginNotification.querySelector("i").className = `fas fa-${icon}`;
+                messageElement.textContent = message;
+                
+                // Set type and show
+                loginNotification.className = `login-notification ${type} show`;
+                
+                // Clear any existing timeout
+                if (window.loginNotificationTimeout) {
+                    clearTimeout(window.loginNotificationTimeout);
+                }
+                
+                // Set new timeout
+                window.loginNotificationTimeout = setTimeout(() => {
+                    loginNotification.classList.remove("show");
+                }, 5000);
+            }
+        }
+
         // Login handler with enhanced validation
         document.getElementById("login-form").addEventListener("submit", async (e) => {
             e.preventDefault();
@@ -745,7 +811,7 @@
                 emailError.textContent = "Please enter your email";
                 emailError.classList.add("show");
                 document.getElementById("email").classList.add("error");
-                showNotification("Please enter your email address", "error", "envelope");
+                showLoginNotification("Please enter your email address", "error", "envelope");
                 return;
             }
             
@@ -753,7 +819,7 @@
                 emailError.textContent = "This email address doesn't look right";
                 emailError.classList.add("show");
                 document.getElementById("email").classList.add("error");
-                showNotification("Hmm, that doesn't look like a valid email", "error", "envelope");
+                showLoginNotification("Hmm, that doesn't look like a valid email", "error", "envelope");
                 return;
             }
             
@@ -762,7 +828,7 @@
                 passwordError.textContent = "Please enter your password";
                 passwordError.classList.add("show");
                 document.getElementById("password").classList.add("error");
-                showNotification("Don't forget your password!", "error", "lock");
+                showLoginNotification("Don't forget your password!", "error", "lock");
                 return;
             }
             
@@ -770,7 +836,7 @@
                 passwordError.textContent = "Your password needs to be at least 6 characters";
                 passwordError.classList.add("show");
                 document.getElementById("password").classList.add("error");
-                showNotification("Your password is too short", "error", "lock");
+                showLoginNotification("Your password is too short", "error", "lock");
                 return;
             }
             
@@ -798,7 +864,7 @@
                     showNotification("Welcome back! You're logged in", "success", "check-circle");
                 } else {
                     await signOut(auth);
-                    showNotification("This email isn't linked to any restaurant", "error", "exclamation-triangle");
+                    showLoginNotification("This email isn't linked to any restaurant", "error", "exclamation-triangle");
                 }
             } catch (error) {
                 console.error("Login error:", error.code, error.message); // Debug log
@@ -828,7 +894,7 @@
                         break;
                 }
                 
-                showNotification(errorMessage, "error", icon);
+                showLoginNotification(errorMessage, "error", icon);
                 document.getElementById("password").value = "";
                 document.getElementById("password").focus();
             } finally {
