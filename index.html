@@ -164,44 +164,117 @@
             width: 100%;
             background: rgba(44, 44, 46, 0.9);
             backdrop-filter: blur(20px);
-            padding: 10px;
+            padding: 12px 0;
             display: flex;
             justify-content: space-around;
-            flex-wrap: wrap;
-            gap: 10px;
+            flex-wrap: nowrap;
+            gap: 8px;
             box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
             z-index: 1000;
             align-items: center;
+            height: auto;
+            min-height: 70px;
         }
         .footer-nav button {
             background: none;
             color: #a1a1a6;
-            padding: 10px 16px;
-            font-size: clamp(0.9rem, 2.5vw, 1.25rem);
+            padding: 8px 12px;
+            font-size: clamp(0.8rem, 2.5vw, 1rem);
             font-weight: 500;
-            border-radius: 16px;
+            border-radius: 12px;
             transition: all 0.3s ease;
             border: none;
             cursor: pointer;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 8px;
-            flex: 1 0 auto;
-            min-width: 80px;
-            max-width: 120px;
+            gap: 4px;
+            flex: 1 1 auto;
+            min-width: 60px;
+            max-width: 100px;
+            position: relative;
+            height: 100%;
+            min-height: 50px;
         }
         .footer-nav button i {
-            font-size: clamp(1rem, 3vw, 1.5rem);
+            font-size: clamp(1.1rem, 3vw, 1.4rem);
+            transition: transform 0.3s ease;
+        }
+        .footer-nav button span {
+            font-size: clamp(0.7rem, 2vw, 0.9rem);
+            transition: transform 0.3s ease;
         }
         .footer-nav button.active {
             background: #007aff;
             color: #fff;
+            transform: translateY(-2px);
+        }
+        .footer-nav button.active i {
+            transform: scale(1.1);
+        }
+        .footer-nav button.active span {
             transform: scale(1.05);
         }
         .footer-nav button:hover:not(.active) {
             color: #fff;
             background: rgba(255, 255, 255, 0.1);
+        }
+        .footer-nav button:active:not(.active) {
+            transform: scale(0.95);
+        }
+        @media (max-width: 768px) {
+            .footer-nav {
+                padding: 10px 0;
+                gap: 6px;
+                min-height: 65px;
+            }
+            .footer-nav button {
+                padding: 6px 10px;
+                min-width: 55px;
+            }
+            .footer-nav button i {
+                font-size: 1.2rem;
+            }
+            .footer-nav button span {
+                font-size: 0.75rem;
+            }
+        }
+        @media (max-width: 480px) {
+            .footer-nav {
+                padding: 8px 0;
+                gap: 4px;
+                min-height: 60px;
+            }
+            .footer-nav button {
+                padding: 6px 8px;
+                min-width: 50px;
+                gap: 2px;
+            }
+            .footer-nav button i {
+                font-size: 1.1rem;
+            }
+            .footer-nav button span {
+                font-size: 0.7rem;
+            }
+            .footer-nav button.active {
+                transform: translateY(-1px);
+            }
+        }
+        @media (max-width: 360px) {
+            .footer-nav {
+                padding: 6px 0;
+                min-height: 55px;
+            }
+            .footer-nav button {
+                padding: 4px 6px;
+                min-width: 45px;
+            }
+            .footer-nav button i {
+                font-size: 1rem;
+            }
+            .footer-nav button span {
+                font-size: 0.65rem;
+            }
         }
         #login-section { 
             position: fixed;
@@ -510,10 +583,22 @@
         </div>
 
         <div class="footer-nav">
-            <button id="dashboard-btn" class="active"><i class="fas fa-chart-line"></i><span>Dashboard</span></button>
-            <button id="delivery-btn"><i class="fas fa-motorcycle"></i><span>Delivery</span></button>
-            <button id="delivered-btn"><i class="fas fa-check-circle"></i><span>Status</span></button>
-            <button id="settings-btn"><i class="fas fa-cog"></i><span>Settings</span></button>
+            <button id="dashboard-btn" class="active" aria-label="Dashboard">
+                <i class="fas fa-chart-line"></i>
+                <span>Dashboard</span>
+            </button>
+            <button id="delivery-btn" aria-label="Active Deliveries">
+                <i class="fas fa-motorcycle"></i>
+                <span>Delivery</span>
+            </button>
+            <button id="delivered-btn" aria-label="Delivery Status">
+                <i class="fas fa-check-circle"></i>
+                <span>Status</span>
+            </button>
+            <button id="settings-btn" aria-label="Settings">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
+            </button>
         </div>
     </div>
 
