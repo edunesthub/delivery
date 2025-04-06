@@ -1,5 +1,5 @@
 // Service Worker: sw.js - Updated on 2025-04-06
-const CACHE_NAME = 'delivery-hub-cache-v3';
+const CACHE_NAME = 'delivery-hub-cache-v4';
 const urlsToCache = [
   '/',
   '/index.html',
