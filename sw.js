@@ -1,5 +1,5 @@
 // Service Worker: sw.js - Updated on 2025-04-06
-const CACHE_NAME = 'delivery-hub-cache-v4';
+const CACHE_NAME = 'delivery-hub-cache-v6';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -38,6 +38,20 @@ self.addEventListener('activate', (event) => {
       )
     ).then(() => self.clients.claim()) // Take control immediately
   );
+});
+
+document.getElementById("force-update-btn").addEventListener("click", async () => {
+  if ('serviceWorker' in navigator) {
+      try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (let reg of registrations) {
+              await reg.update(); // Force service worker update
+          }
+      } catch (error) {
+          console.error("Service worker update failed:", error);
+      }
+  }
+  location.reload(); // Perform hard refresh
 });
 
 // Fetch event: Serve cached content or fetch from network

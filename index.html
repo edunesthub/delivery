@@ -578,8 +578,8 @@
 
         <div id="settings" class="section hidden">
             <h2>Settings</h2><br>
+            <button id="force-update-btn" class="btn">Force Update</button><br>
             <button id="logout-btn" class="btn btn-secondary">Logout</button>
-            <p class="text-gray-400 mt-6">More settings coming soon.</p>
         </div>
 
         <div class="footer-nav">
@@ -759,7 +759,8 @@
                     const card = document.createElement("div");
                     card.className = "order-card";
                     card.innerHTML = `
-                        <p style="font-size: 1.5rem; font-weight: 600;"><strong>Location:</strong> ${deliveryDetails.location || "N/A"}</p>
+                    <p style="font-size: 1.5rem; font-weight: 600;"><strong>Hostel:</strong> ${deliveryDetails.hostel || "N/A"}</p>
+                        <p style="font-size: 1.5rem; font-weight: 600;"><strong>Room:</strong> ${deliveryDetails.location || "N/A"}</p>
                         <p style="font-size: 1.5rem; font-weight: 600;"><strong>Contact:</strong> ${deliveryDetails.contactNumber || "N/A"}</p>
                         <p style="font-size: 1.5rem; font-weight: 600;"><strong>Items:</strong> ${items}</p>
                         <p><strong>Note:</strong> ${deliveryDetails.deliveryNotes || "None"}</p>
@@ -870,6 +871,12 @@
                 }, 5000);
             }
         }
+
+        // Force update handler
+document.getElementById("force-update-btn").addEventListener("click", () => {
+    // Perform a hard refresh, bypassing cache
+    location.reload(true);
+});
 
         // Login handler with enhanced validation
         document.getElementById("login-form").addEventListener("submit", async (e) => {
