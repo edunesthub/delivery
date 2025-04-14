@@ -610,7 +610,7 @@
         import { 
             getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged 
         } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
-
+    
         const firebaseConfig = {
             apiKey: "AIzaSyADvpUQWo75ExePGoCRirD2mM-lmfM4Cmc",
             authDomain: "von600-7982d.firebaseapp.com",
@@ -620,12 +620,11 @@
             appId: "1:164591218045:web:afe17512e16573e7903014",
             measurementId: "G-E69DMPLXBK"
         };
-
+    
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        let restaurantId = null;
-
+    
         // Cache DOM elements
         const loadingScreen = document.getElementById("loading-screen");
         const loginSection = document.getElementById("login-section");
@@ -634,41 +633,28 @@
         const dashboardGrid = document.getElementById("dashboard-grid");
         const deliveryList = document.getElementById("delivery-list");
         const deliveredList = document.getElementById("delivered-list");
-
-        // Enhanced notification function with improved visibility
+    
+        // Enhanced notification function
         function showNotification(message, type = "success", icon = "check-circle") {
-            console.log("Showing notification:", message, type); // Debug log
-            
-            // Get or create notification element
+            console.log("Showing notification:", message, type);
             let notification = document.getElementById("notification");
-            
             if (!notification) {
                 notification = document.createElement("div");
                 notification.id = "notification";
                 notification.className = "notification";
                 document.body.appendChild(notification);
-                console.log("Created new notification element");
             }
-            
-            // Set content and show
             notification.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
             notification.className = `notification ${type} show`;
-            
-            // Force repaint to ensure animation works
             notification.offsetHeight;
-            
-            // Clear any existing timeout
             if (window.notificationTimeout) {
                 clearTimeout(window.notificationTimeout);
             }
-            
-            // Set new timeout
             window.notificationTimeout = setTimeout(() => {
                 notification.classList.remove("show");
-                console.log("Hiding notification");
             }, 4000);
         }
-
+    
         // Efficient section toggling
         function toggleSection(sectionId) {
             const sections = ["dashboard", "delivery", "delivered", "settings"];
@@ -678,88 +664,111 @@
                 document.getElementById(`${id}-btn`).classList.toggle("active", id === sectionId);
             });
         }
-
-        // Load dashboard data (optimized for speed)
+    
+        // Load dashboard data
         function loadDashboard() {
-            if (!restaurantId) return;
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayTimestamp = today.getTime();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTimestamp = today.getTime();
+    const tomorrowTimestamp = todayTimestamp + 24 * 60 * 60 * 1000;
 
-            let totalDeliveries = 0;
-            let activeDeliveries = 0;
-            let completedToday = 0;
+    let todaysDeliveries = 0;
+    let activeDeliveries = 0;
+    let completedToday = 0;
 
-            const q = query(collection(db, "orders"), where("restaurantId", "==", restaurantId));
-            onSnapshot(q, (snapshot) => {
-                totalDeliveries = snapshot.size;
-                activeDeliveries = 0;
-                completedToday = 0;
+    const q = query(collection(db, "orders"), where("status", "in", ["being_delivered", "delivered", "not_delivered"]));
+    onSnapshot(q, (snapshot) => {
+        todaysDeliveries = 0;
+        activeDeliveries = 0;
+        completedToday = 0;
 
-                snapshot.forEach(doc => {
-                    const order = doc.data();
-                    const timestamp = new Date(order.timestamp).getTime();
+        snapshot.forEach(doc => {
+            const order = doc.data();
+            const deliveredTimestamp = order.beingDeliveredTimestamp 
+                ? new Date(order.beingDeliveredTimestamp).getTime()
+                : new Date(order.timestamp).getTime();
 
-                    if (order.status === "delivered" && timestamp >= todayTimestamp) {
-                        completedToday++;
-                    }
-                    if (order.status === "being_delivered") {
-                        activeDeliveries++;
-                    }
-                });
+            // Count orders received today for Today's Deliveries
+            if (deliveredTimestamp >= todayTimestamp && deliveredTimestamp < tomorrowTimestamp) {
+                todaysDeliveries++;
+            }
 
-                const totalAmountToday = completedToday * 5; // 5 cedis per completed order
+            // Count active deliveries
+            if (order.status === "being_delivered") {
+                activeDeliveries++;
+            }
 
-                dashboardGrid.innerHTML = `
-                    <div class="dashboard-card">
-                        <h3>Total Orders</h3>
-                        <p>${totalDeliveries}</p>
-                    </div>
-                    <div class="dashboard-card">
-                        <h3>Completed Today</h3>
-                        <p>${completedToday}</p>
-                    </div>
-                    <div class="dashboard-card">
-                        <h3>Total Amount (Today)</h3>
-                        <p>GH₵${totalAmountToday.toFixed(2)}</p>
-                    </div>
-                    <div class="dashboard-card">
-                        <h3>Active Deliveries</h3>
-                        <p>${activeDeliveries}</p>
-                    </div>
-                `;
-            }, (error) => {
-                console.error("Dashboard error:", error);
-                dashboardGrid.innerHTML = `<p class='text-gray-400'>Error loading dashboard.</p>`;
-            });
-        }
+            // Count completed deliveries for today
+            if (order.status === "delivered" && deliveredTimestamp >= todayTimestamp && deliveredTimestamp < tomorrowTimestamp) {
+                completedToday++;
+            }
+        });
 
-        // Optimized order loading with reordered fields
-        function loadOrders(statusFilter, targetElement, emptyMessage) {
-            if (!restaurantId) return;
-            const q = query(collection(db, "orders"), where("restaurantId", "==", restaurantId));
-            onSnapshot(q, (snapshot) => {
+        const totalAmountToday = completedToday * 5;
+
+        dashboardGrid.innerHTML = `
+            <div class="dashboard-card">
+                <h3>Today's Deliveries</h3>
+                <p>${todaysDeliveries}</p>
+            </div>
+            <div class="dashboard-card">
+                <h3>Completed Today</h3>
+                <p>${completedToday}</p>
+            </div>
+            <div class="dashboard-card">
+                <h3>Total Amount (Today)</h3>
+                <p>GH₵${totalAmountToday.toFixed(2)}</p>
+            </div>
+            <div class="dashboard-card">
+                <h3>Active Deliveries</h3>
+                <p>${activeDeliveries}</p>
+            </div>
+        `;
+    }, (error) => {
+        console.error("Dashboard error:", error);
+        dashboardGrid.innerHTML = `<p class='text-gray-400'>Error loading dashboard.</p>`;
+    });
+}
+    
+        // Load orders
+        async function loadOrders(statusFilter, targetElement, emptyMessage) {
+            const q = query(collection(db, "orders"), where("status", "in", ["being_delivered", "delivered", "not_delivered"]));
+            onSnapshot(q, async (snapshot) => {
                 const orders = snapshot.docs
                     .map(doc => ({ id: doc.id, ...doc.data() }))
                     .filter(order => statusFilter(order.status))
                     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                
+    
                 if (!orders.length) {
                     targetElement.innerHTML = `<p class='text-gray-400'>${emptyMessage}</p>`;
                     return;
                 }
-
-                targetElement.innerHTML = ''; // Clear previous content
-                orders.forEach(order => {
+    
+                targetElement.innerHTML = '';
+                for (const order of orders) {
                     const items = order.items.map(item => `${item.quantity}x ${item.name}`).join(", ");
                     const deliveryDetails = order.deliveryDetails || {};
                     const statusText = order.status === "delivered" ? "Delivered" : order.status === "not_delivered" ? "Not Delivered" : "In Transit";
                     const statusClass = order.status === "delivered" ? "status" : order.status === "not_delivered" ? "status not-delivered" : "status";
-
+    
+                    let restaurantName = order.restaurantName || "Unknown Restaurant";
+                    if (order.restaurantId && !order.restaurantName) {
+                        try {
+                            const restaurantRef = doc(db, "restaurants", order.restaurantId);
+                            const restaurantSnap = await getDoc(restaurantRef);
+                            if (restaurantSnap.exists()) {
+                                restaurantName = restaurantSnap.data().name || "Unknown Restaurant";
+                            }
+                        } catch (error) {
+                            console.error("Error fetching restaurant name:", error);
+                        }
+                    }
+    
                     const card = document.createElement("div");
                     card.className = "order-card";
                     card.innerHTML = `
-                    <p style="font-size: 1.5rem; font-weight: 600;"><strong>Hostel:</strong> ${deliveryDetails.hostel || "N/A"}</p>
+                        <p style="font-size: 1.5rem; font-weight: 600;"><strong>Restaurant:</strong> ${restaurantName}</p>
+                        <p style="font-size: 1.5rem; font-weight: 600;"><strong>Hostel:</strong> ${deliveryDetails.hostel || "N/A"}</p>
                         <p style="font-size: 1.5rem; font-weight: 600;"><strong>Room:</strong> ${deliveryDetails.location || "N/A"}</p>
                         <p style="font-size: 1.5rem; font-weight: 600;"><strong>Contact:</strong> ${deliveryDetails.contactNumber || "N/A"}</p>
                         <p style="font-size: 1.5rem; font-weight: 600;"><strong>Items:</strong> ${items}</p>
@@ -775,13 +784,13 @@
                         ` : ""}
                     `;
                     targetElement.appendChild(card);
-                });
+                }
             }, (error) => {
                 showNotification("Error loading data!", "error");
                 targetElement.innerHTML = `<p class='text-gray-400'>Error loading data.</p>`;
             });
         }
-
+    
         // Fast status updates
         async function markOrderAsDelivered(orderId) {
             try {
@@ -793,7 +802,7 @@
                 showNotification("Couldn't update the status right now", "error");
             }
         }
-
+    
         async function markOrderAsNotDelivered(orderId) {
             try {
                 const orderRef = doc(db, "orders", orderId);
@@ -804,7 +813,7 @@
                 showNotification("Couldn't update the status right now", "error");
             }
         }
-
+    
         // Event delegation for button clicks
         deliveryList.addEventListener("click", (e) => {
             const target = e.target;
@@ -816,72 +825,49 @@
                 if (orderId) markOrderAsNotDelivered(orderId);
             }
         });
-
-        // Immediate auth check with loading screen
+    
+        // Immediate auth check
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                const mappingRef = doc(db, "vendorMappings", user.email);
-                const mappingSnap = await getDoc(mappingRef);
-                if (mappingSnap.exists()) {
-                    restaurantId = mappingSnap.data().restaurantId;
-                    loadingScreen.style.display = "none";
-                    loginSection.style.display = "none";
-                    mainContent.classList.remove("hidden");
-                    loadDashboard();
-                    loadOrders(s => s === "being_delivered", deliveryList, "No active deliveries.");
-                    loadOrders(s => s === "delivered" || s === "not_delivered", deliveredList, "No completed deliveries.");
-                } else {
-                    signOut(auth);
-                    loadingScreen.style.display = "none";
-                    loginSection.style.display = "flex";
-                    mainContent.classList.add("hidden");
-                    showNotification("No restaurant assigned to this email!", "error");
-                }
+                loadingScreen.style.display = "none";
+                loginSection.style.display = "none";
+                mainContent.classList.remove("hidden");
+                loadDashboard();
+                loadOrders(s => s === "being_delivered", deliveryList, "No active deliveries.");
+                loadOrders(s => s === "delivered" || s === "not_delivered", deliveredList, "No completed deliveries.");
             } else {
                 loadingScreen.style.display = "none";
                 loginSection.style.display = "flex";
                 mainContent.classList.add("hidden");
-                restaurantId = null;
             }
         });
-
-        // Show login notification specifically in the login form
+    
+        // Show login notification
         function showLoginNotification(message, type = "error", icon = "exclamation-circle") {
             console.log("Showing login notification:", message, type);
-            
             const loginNotification = document.getElementById("login-notification");
             const messageElement = document.getElementById("login-notification-message");
-            
             if (loginNotification && messageElement) {
-                // Update icon and message
                 loginNotification.querySelector("i").className = `fas fa-${icon}`;
                 messageElement.textContent = message;
-                
-                // Set type and show
                 loginNotification.className = `login-notification ${type} show`;
-                
-                // Clear any existing timeout
                 if (window.loginNotificationTimeout) {
                     clearTimeout(window.loginNotificationTimeout);
                 }
-                
-                // Set new timeout
                 window.loginNotificationTimeout = setTimeout(() => {
                     loginNotification.classList.remove("show");
                 }, 5000);
             }
         }
-
+    
         // Force update handler
-document.getElementById("force-update-btn").addEventListener("click", () => {
-    // Perform a hard refresh, bypassing cache
-    location.reload(true);
-});
-
-        // Login handler with enhanced validation
+        document.getElementById("force-update-btn").addEventListener("click", () => {
+            location.reload(true);
+        });
+    
+        // Login handler
         document.getElementById("login-form").addEventListener("submit", async (e) => {
             e.preventDefault();
-            
             const email = document.getElementById("email").value;
             const password = document.getElementById("password").value;
             const emailError = document.getElementById("email-error");
@@ -889,16 +875,11 @@ document.getElementById("force-update-btn").addEventListener("click", () => {
             const loginBtn = document.getElementById("login-btn");
             const spinner = loginBtn.querySelector(".loading-spinner");
             const btnText = loginBtn.querySelector("span");
-            
-            console.log("Login attempt with email:", email); // Debug log
-            
-            // Reset error states
+            console.log("Login attempt with email:", email);
             emailError.classList.remove("show");
             passwordError.classList.remove("show");
             document.getElementById("email").classList.remove("error");
             document.getElementById("password").classList.remove("error");
-            
-            // Validate email
             if (!email) {
                 emailError.textContent = "Please enter your email";
                 emailError.classList.add("show");
@@ -906,7 +887,6 @@ document.getElementById("force-update-btn").addEventListener("click", () => {
                 showLoginNotification("Please enter your email address", "error", "envelope");
                 return;
             }
-            
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
                 emailError.textContent = "This email address doesn't look right";
                 emailError.classList.add("show");
@@ -914,8 +894,6 @@ document.getElementById("force-update-btn").addEventListener("click", () => {
                 showLoginNotification("Hmm, that doesn't look like a valid email", "error", "envelope");
                 return;
             }
-            
-            // Validate password
             if (!password) {
                 passwordError.textContent = "Please enter your password";
                 passwordError.classList.add("show");
@@ -923,7 +901,6 @@ document.getElementById("force-update-btn").addEventListener("click", () => {
                 showLoginNotification("Don't forget your password!", "error", "lock");
                 return;
             }
-            
             if (password.length < 6) {
                 passwordError.textContent = "Your password needs to be at least 6 characters";
                 passwordError.classList.add("show");
@@ -931,39 +908,19 @@ document.getElementById("force-update-btn").addEventListener("click", () => {
                 showLoginNotification("Your password is too short", "error", "lock");
                 return;
             }
-            
-            // Show loading state
             loginBtn.disabled = true;
             btnText.textContent = "Logging in...";
             spinner.classList.add("show");
-            
             try {
-                // Simulate wrong password for testing - COMMENT OUT FOR PRODUCTION
-                // throw { code: "auth/wrong-password" };
-                
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                const mappingRef = doc(db, "vendorMappings", userCredential.user.email);
-                const mappingSnap = await getDoc(mappingRef);
-                
-                if (mappingSnap.exists()) {
-                    restaurantId = mappingSnap.data().restaurantId;
-                    loadingScreen.style.display = "none";
-                    loginSection.style.display = "none";
-                    mainContent.classList.remove("hidden");
-                    loadDashboard();
-                    loadOrders(s => s === "being_delivered", deliveryList, "No active deliveries.");
-                    loadOrders(s => s === "delivered" || s === "not_delivered", deliveredList, "No completed deliveries.");
-                    showNotification("Welcome back! You're logged in", "success", "check-circle");
-                } else {
-                    await signOut(auth);
-                    showLoginNotification("This email isn't linked to any restaurant", "error", "exclamation-triangle");
-                }
+                await signInWithEmailAndPassword(auth, email, password);
+                loadingScreen.style.display = "none";
+                loginSection.style.display = "none";
+                mainContent.classList.remove("hidden");
+                showLoginNotification("Welcome back! You're logged in", "success", "check-circle");
             } catch (error) {
-                console.error("Login error:", error.code, error.message); // Debug log
-                
+                console.error("Login error:", error.code, error.message);
                 let errorMessage = "Something went wrong. Let's try again.";
                 let icon = "exclamation-circle";
-                
                 switch (error.code) {
                     case "auth/user-not-found":
                         errorMessage = "We couldn't find an account with this email";
@@ -985,7 +942,6 @@ document.getElementById("force-update-btn").addEventListener("click", () => {
                         errorMessage = "Wrong password or email. Please try again.";
                         break;
                 }
-                
                 showLoginNotification(errorMessage, "error", icon);
                 document.getElementById("password").value = "";
                 document.getElementById("password").focus();
@@ -995,12 +951,11 @@ document.getElementById("force-update-btn").addEventListener("click", () => {
                 spinner.classList.remove("show");
             }
         });
-
+    
         // Password visibility toggle
         document.querySelector(".password-toggle").addEventListener("click", function() {
             const passwordInput = document.getElementById("password");
             const icon = this.querySelector("i");
-            
             if (passwordInput.type === "password") {
                 passwordInput.type = "text";
                 icon.classList.remove("fa-eye");
@@ -1011,8 +966,8 @@ document.getElementById("force-update-btn").addEventListener("click", () => {
                 icon.classList.add("fa-eye");
             }
         });
-
-        // Auto-focus email field when login section is shown
+    
+        // Auto-focus email field
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.attributeName === "style" && loginSection.style.display === "flex") {
@@ -1020,38 +975,35 @@ document.getElementById("force-update-btn").addEventListener("click", () => {
                 }
             });
         });
-        
         observer.observe(loginSection, { attributes: true });
-
+    
         // Handle Enter key for login
         document.getElementById("password").addEventListener("keypress", (e) => {
             if (e.key === "Enter") {
                 document.getElementById("login-form").dispatchEvent(new Event("submit"));
             }
         });
-
+    
         // Logout handler
         document.getElementById("logout-btn").addEventListener("click", async () => {
             await signOut(auth);
             showNotification("You've been logged out. See you soon!");
         });
-        
+    
         if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    for (let reg of regs) reg.update();
-  });
-}
-
+            navigator.serviceWorker.getRegistrations().then(regs => {
+                for (let reg of regs) reg.update();
+            });
+        }
+    
         // Navigation handlers
         document.getElementById("dashboard-btn").addEventListener("click", () => { toggleSection("dashboard"); loadDashboard(); });
         document.getElementById("delivery-btn").addEventListener("click", () => toggleSection("delivery"));
         document.getElementById("delivered-btn").addEventListener("click", () => toggleSection("delivered"));
         document.getElementById("settings-btn").addEventListener("click", () => toggleSection("settings"));
-
-        // Ensure loading screen is visible until auth resolves
-        document.addEventListener("DOMContentLoaded", () => {
-            // Loading screen is already visible by default via inline style
-        });
+    
+        // Ensure loading screen is visible
+        document.addEventListener("DOMContentLoaded", () => {});
     </script>
     
     <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'92b388da784db063',t:'MTc0Mzc5ODMyMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
