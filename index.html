@@ -655,6 +655,40 @@
             }, 4000);
         }
     
+        // Show login notification
+        function showLoginNotification(message, type = "error", icon = "exclamation-circle") {
+            console.log("Showing login notification:", message, type);
+            const loginNotification = document.getElementById("login-notification");
+            const messageElement = document.getElementById("login-notification-message");
+            if (loginNotification && messageElement) {
+                loginNotification.querySelector("i").className = `fas fa-${icon}`;
+                messageElement.textContent = message;
+                loginNotification.className = `login-notification ${type} show`;
+                if (window.loginNotificationTimeout) {
+                    clearTimeout(window.loginNotificationTimeout);
+                }
+                window.loginNotificationTimeout = setTimeout(() => {
+                    loginNotification.classList.remove("show");
+                }, 5000);
+            }
+        }
+    
+        // Check if user is in deliveryMapping
+        async function isAuthorizedDeliveryUser(email) {
+            try {
+                const deliveryMappingRef = doc(db, "deliveryMapping", email);
+                const deliveryMappingSnap = await getDoc(deliveryMappingRef);
+                if (deliveryMappingSnap.exists()) {
+                    const data = deliveryMappingSnap.data();
+                    return data.isDelivery === true;
+                }
+                return false;
+            } catch (error) {
+                console.error("Error checking deliveryMapping:", error);
+                return false;
+            }
+        }
+    
         // Efficient section toggling
         function toggleSection(sectionId) {
             const sections = ["dashboard", "delivery", "delivered", "settings"];
@@ -667,68 +701,65 @@
     
         // Load dashboard data
         function loadDashboard() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTimestamp = today.getTime();
-    const tomorrowTimestamp = todayTimestamp + 24 * 60 * 60 * 1000;
-
-    let todaysDeliveries = 0;
-    let activeDeliveries = 0;
-    let completedToday = 0;
-
-    const q = query(collection(db, "orders"), where("status", "in", ["being_delivered", "delivered", "not_delivered"]));
-    onSnapshot(q, (snapshot) => {
-        todaysDeliveries = 0;
-        activeDeliveries = 0;
-        completedToday = 0;
-
-        snapshot.forEach(doc => {
-            const order = doc.data();
-            const deliveredTimestamp = order.beingDeliveredTimestamp 
-                ? new Date(order.beingDeliveredTimestamp).getTime()
-                : new Date(order.timestamp).getTime();
-
-            // Count orders received today for Today's Deliveries
-            if (deliveredTimestamp >= todayTimestamp && deliveredTimestamp < tomorrowTimestamp) {
-                todaysDeliveries++;
-            }
-
-            // Count active deliveries
-            if (order.status === "being_delivered") {
-                activeDeliveries++;
-            }
-
-            // Count completed deliveries for today
-            if (order.status === "delivered" && deliveredTimestamp >= todayTimestamp && deliveredTimestamp < tomorrowTimestamp) {
-                completedToday++;
-            }
-        });
-
-        const totalAmountToday = completedToday * 5;
-
-        dashboardGrid.innerHTML = `
-            <div class="dashboard-card">
-                <h3>Today's Deliveries</h3>
-                <p>${todaysDeliveries}</p>
-            </div>
-            <div class="dashboard-card">
-                <h3>Completed Today</h3>
-                <p>${completedToday}</p>
-            </div>
-            <div class="dashboard-card">
-                <h3>Total Amount (Today)</h3>
-                <p>GH₵${totalAmountToday.toFixed(2)}</p>
-            </div>
-            <div class="dashboard-card">
-                <h3>Active Deliveries</h3>
-                <p>${activeDeliveries}</p>
-            </div>
-        `;
-    }, (error) => {
-        console.error("Dashboard error:", error);
-        dashboardGrid.innerHTML = `<p class='text-gray-400'>Error loading dashboard.</p>`;
-    });
-}
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayTimestamp = today.getTime();
+            const tomorrowTimestamp = todayTimestamp + 24 * 60 * 60 * 1000;
+    
+            let todaysDeliveries = 0;
+            let activeDeliveries = 0;
+            let completedToday = 0;
+    
+            const q = query(collection(db, "orders"), where("status", "in", ["being_delivered", "delivered", "not_delivered"]));
+            onSnapshot(q, (snapshot) => {
+                todaysDeliveries = 0;
+                activeDeliveries = 0;
+                completedToday = 0;
+    
+                snapshot.forEach(doc => {
+                    const order = doc.data();
+                    const deliveredTimestamp = order.beingDeliveredTimestamp 
+                        ? new Date(order.beingDeliveredTimestamp).getTime()
+                        : new Date(order.timestamp).getTime();
+    
+                    if (deliveredTimestamp >= todayTimestamp && deliveredTimestamp < tomorrowTimestamp) {
+                        todaysDeliveries++;
+                    }
+    
+                    if (order.status === "being_delivered") {
+                        activeDeliveries++;
+                    }
+    
+                    if (order.status === "delivered" && deliveredTimestamp >= todayTimestamp && deliveredTimestamp < tomorrowTimestamp) {
+                        completedToday++;
+                    }
+                });
+    
+                const totalAmountToday = completedToday * 5;
+    
+                dashboardGrid.innerHTML = `
+                    <div class="dashboard-card">
+                        <h3>Today's Deliveries</h3>
+                        <p>${todaysDeliveries}</p>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3>Completed Today</h3>
+                        <p>${completedToday}</p>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3>Total Amount (Today)</h3>
+                        <p>GH₵${totalAmountToday.toFixed(2)}</p>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3>Active Deliveries</h3>
+                        <p>${activeDeliveries}</p>
+                    </div>
+                `;
+            }, (error) => {
+                console.error("Dashboard error:", error);
+                dashboardGrid.innerHTML = `<p class='text-gray-400'>Error loading dashboard.</p>`;
+            });
+        }
     
         // Load orders
         async function loadOrders(statusFilter, targetElement, emptyMessage) {
@@ -826,15 +857,24 @@
             }
         });
     
-        // Immediate auth check
+        // Immediate auth check with deliveryMapping
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                loadingScreen.style.display = "none";
-                loginSection.style.display = "none";
-                mainContent.classList.remove("hidden");
-                loadDashboard();
-                loadOrders(s => s === "being_delivered", deliveryList, "No active deliveries.");
-                loadOrders(s => s === "delivered" || s === "not_delivered", deliveredList, "No completed deliveries.");
+                const isAuthorized = await isAuthorizedDeliveryUser(user.email);
+                if (isAuthorized) {
+                    loadingScreen.style.display = "none";
+                    loginSection.style.display = "none";
+                    mainContent.classList.remove("hidden");
+                    loadDashboard();
+                    loadOrders(s => s === "being_delivered", deliveryList, "No active deliveries.");
+                    loadOrders(s => s === "delivered" || s === "not_delivered", deliveredList, "No completed deliveries.");
+                } else {
+                    await signOut(auth);
+                    loadingScreen.style.display = "none";
+                    loginSection.style.display = "flex";
+                    mainContent.classList.add("hidden");
+                    showLoginNotification("This account is not authorized for the delivery portal", "error", "ban");
+                }
             } else {
                 loadingScreen.style.display = "none";
                 loginSection.style.display = "flex";
@@ -842,30 +882,12 @@
             }
         });
     
-        // Show login notification
-        function showLoginNotification(message, type = "error", icon = "exclamation-circle") {
-            console.log("Showing login notification:", message, type);
-            const loginNotification = document.getElementById("login-notification");
-            const messageElement = document.getElementById("login-notification-message");
-            if (loginNotification && messageElement) {
-                loginNotification.querySelector("i").className = `fas fa-${icon}`;
-                messageElement.textContent = message;
-                loginNotification.className = `login-notification ${type} show`;
-                if (window.loginNotificationTimeout) {
-                    clearTimeout(window.loginNotificationTimeout);
-                }
-                window.loginNotificationTimeout = setTimeout(() => {
-                    loginNotification.classList.remove("show");
-                }, 5000);
-            }
-        }
-    
         // Force update handler
         document.getElementById("force-update-btn").addEventListener("click", () => {
             location.reload(true);
         });
     
-        // Login handler
+        // Login handler with deliveryMapping check
         document.getElementById("login-form").addEventListener("submit", async (e) => {
             e.preventDefault();
             const email = document.getElementById("email").value;
@@ -875,11 +897,13 @@
             const loginBtn = document.getElementById("login-btn");
             const spinner = loginBtn.querySelector(".loading-spinner");
             const btnText = loginBtn.querySelector("span");
+    
             console.log("Login attempt with email:", email);
             emailError.classList.remove("show");
             passwordError.classList.remove("show");
             document.getElementById("email").classList.remove("error");
             document.getElementById("password").classList.remove("error");
+    
             if (!email) {
                 emailError.textContent = "Please enter your email";
                 emailError.classList.add("show");
@@ -908,11 +932,18 @@
                 showLoginNotification("Your password is too short", "error", "lock");
                 return;
             }
+    
             loginBtn.disabled = true;
             btnText.textContent = "Logging in...";
             spinner.classList.add("show");
+    
             try {
                 await signInWithEmailAndPassword(auth, email, password);
+                const isAuthorized = await isAuthorizedDeliveryUser(email);
+                if (!isAuthorized) {
+                    await signOut(auth);
+                    throw new Error("unauthorized");
+                }
                 loadingScreen.style.display = "none";
                 loginSection.style.display = "none";
                 mainContent.classList.remove("hidden");
@@ -921,27 +952,34 @@
                 console.error("Login error:", error.code, error.message);
                 let errorMessage = "Something went wrong. Let's try again.";
                 let icon = "exclamation-circle";
-                switch (error.code) {
-                    case "auth/user-not-found":
-                        errorMessage = "We couldn't find an account with this email";
-                        icon = "user-times";
-                        break;
-                    case "auth/wrong-password":
-                        errorMessage = "Oops! That password doesn't match our records";
-                        icon = "lock";
-                        break;
-                    case "auth/too-many-requests":
-                        errorMessage = "Too many attempts. Please take a short break and try again";
-                        icon = "clock";
-                        break;
-                    case "auth/network-request-failed":
-                        errorMessage = "Can't connect right now. Check your internet connection";
-                        icon = "wifi";
-                        break;
-                    default:
-                        errorMessage = "Wrong password or email. Please try again.";
-                        break;
+    
+                if (error.message === "unauthorized") {
+                    errorMessage = "This account is not authorized for the delivery portal";
+                    icon = "ban";
+                } else {
+                    switch (error.code) {
+                        case "auth/user-not-found":
+                            errorMessage = "We couldn't find an account with this email";
+                            icon = "user-times";
+                            break;
+                        case "auth/wrong-password":
+                            errorMessage = "Oops! That password doesn't match our records";
+                            icon = "lock";
+                            break;
+                        case "auth/too-many-requests":
+                            errorMessage = "Too many attempts. Please take a short break and try again";
+                            icon = "clock";
+                            break;
+                        case "auth/network-request-failed":
+                            errorMessage = "Can't connect right now. Check your internet connection";
+                            icon = "wifi";
+                            break;
+                        default:
+                            errorMessage = "Wrong password or email. Please try again.";
+                            break;
+                    }
                 }
+    
                 showLoginNotification(errorMessage, "error", icon);
                 document.getElementById("password").value = "";
                 document.getElementById("password").focus();
