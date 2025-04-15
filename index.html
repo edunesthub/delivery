@@ -147,6 +147,7 @@
         .notification.show {
             opacity: 1;
             transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
         }
         .notification.error {
             background: #ff3b30;
@@ -512,6 +513,10 @@
                 padding: 10px 16px;
             }
         }
+        /* Dismiss button for no-hostels notification */
+        .notification .dismiss-btn:hover {
+            color: #ff3b30;
+        }
     </style>
 </head>
 <body>
@@ -520,7 +525,7 @@
         <h1 style="font-size: 3rem; font-weight: 600; letter-spacing: -2px; background: linear-gradient(45deg, #007aff, #34c759, #007aff); -webkit-background-clip: text; background-clip: text; color: transparent;">Chawp</h1>
     </div>
 
-    <!-- Notification element added to ensure it exists and is positioned correctly -->
+    <!-- Notification element -->
     <div id="notification" class="notification" style="z-index: 3000;"></div>
 
     <!-- Login section (hidden by default) -->
@@ -557,8 +562,6 @@
             <h1>Chawp Delivery</h1>
             <p class="subtitle">Your command center for seamless deliveries</p>
         </div>
-
-        <div id="notification" class="notification"></div>
 
         <!-- Dashboard Section -->
         <div id="dashboard" class="section">
@@ -610,7 +613,7 @@
         import { 
             getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged 
         } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
-    
+
         const firebaseConfig = {
             apiKey: "AIzaSyADvpUQWo75ExePGoCRirD2mM-lmfM4Cmc",
             authDomain: "von600-7982d.firebaseapp.com",
@@ -620,11 +623,11 @@
             appId: "1:164591218045:web:afe17512e16573e7903014",
             measurementId: "G-E69DMPLXBK"
         };
-    
+
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-    
+
         // Cache DOM elements
         const loadingScreen = document.getElementById("loading-screen");
         const loginSection = document.getElementById("login-section");
@@ -633,7 +636,10 @@
         const dashboardGrid = document.getElementById("dashboard-grid");
         const deliveryList = document.getElementById("delivery-list");
         const deliveredList = document.getElementById("delivered-list");
-    
+
+        // Store allowed hostels globally
+        window.allowedHostels = null;
+
         // Enhanced notification function
         function showNotification(message, type = "success", icon = "check-circle") {
             console.log("Showing notification:", message, type);
@@ -654,7 +660,7 @@
                 notification.classList.remove("show");
             }, 4000);
         }
-    
+
         // Show login notification
         function showLoginNotification(message, type = "error", icon = "exclamation-circle") {
             console.log("Showing login notification:", message, type);
@@ -672,7 +678,30 @@
                 }, 5000);
             }
         }
-    
+
+        // Show no-hostels notification (persistent, dismissible)
+        function showNoHostelsNotification() {
+            let noHostelsNotification = document.getElementById("no-hostels-notification");
+            if (!noHostelsNotification) {
+                noHostelsNotification = document.createElement("div");
+                noHostelsNotification.id = "no-hostels-notification";
+                noHostelsNotification.className = "notification warning";
+                noHostelsNotification.style.background = "linear-gradient(45deg, #007aff, #34c759)";
+                noHostelsNotification.innerHTML = `
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>No hostels assigned to your account. Please contact the admin to get started.</span>
+                    <button class="dismiss-btn" style="background: none; border: none; color: #fff; font-size: 1rem; cursor: pointer; margin-left: 10px;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                document.body.appendChild(noHostelsNotification);
+                noHostelsNotification.querySelector(".dismiss-btn").addEventListener("click", () => {
+                    noHostelsNotification.classList.remove("show");
+                });
+            }
+            noHostelsNotification.classList.add("show");
+        }
+
         // Check if user is in deliveryMapping
         async function isAuthorizedDeliveryUser(email) {
             try {
@@ -680,15 +709,18 @@
                 const deliveryMappingSnap = await getDoc(deliveryMappingRef);
                 if (deliveryMappingSnap.exists()) {
                     const data = deliveryMappingSnap.data();
+                    window.allowedHostels = data.allowedHostels || [];
                     return data.isDelivery === true;
                 }
+                window.allowedHostels = [];
                 return false;
             } catch (error) {
                 console.error("Error checking deliveryMapping:", error);
+                window.allowedHostels = [];
                 return false;
             }
         }
-    
+
         // Efficient section toggling
         function toggleSection(sectionId) {
             const sections = ["dashboard", "delivery", "delivered", "settings"];
@@ -698,45 +730,55 @@
                 document.getElementById(`${id}-btn`).classList.toggle("active", id === sectionId);
             });
         }
-    
+
         // Load dashboard data
         function loadDashboard() {
+            if (!window.allowedHostels || window.allowedHostels.length === 0) {
+                dashboardGrid.innerHTML = `<p class='text-gray-400'>No hostels assigned. Please contact the admin.</p>`;
+                showNoHostelsNotification();
+                return;
+            }
+
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const todayTimestamp = today.getTime();
             const tomorrowTimestamp = todayTimestamp + 24 * 60 * 60 * 1000;
-    
+
             let todaysDeliveries = 0;
             let activeDeliveries = 0;
             let completedToday = 0;
-    
+
             const q = query(collection(db, "orders"), where("status", "in", ["being_delivered", "delivered", "not_delivered"]));
             onSnapshot(q, (snapshot) => {
                 todaysDeliveries = 0;
                 activeDeliveries = 0;
                 completedToday = 0;
-    
+
                 snapshot.forEach(doc => {
                     const order = doc.data();
+                    if (!order.deliveryDetails || !order.deliveryDetails.hostel || !window.allowedHostels.includes(order.deliveryDetails.hostel)) {
+                        return;
+                    }
+
                     const deliveredTimestamp = order.beingDeliveredTimestamp 
                         ? new Date(order.beingDeliveredTimestamp).getTime()
                         : new Date(order.timestamp).getTime();
-    
+
                     if (deliveredTimestamp >= todayTimestamp && deliveredTimestamp < tomorrowTimestamp) {
                         todaysDeliveries++;
                     }
-    
+
                     if (order.status === "being_delivered") {
                         activeDeliveries++;
                     }
-    
+
                     if (order.status === "delivered" && deliveredTimestamp >= todayTimestamp && deliveredTimestamp < tomorrowTimestamp) {
                         completedToday++;
                     }
                 });
-    
+
                 const totalAmountToday = completedToday * 5;
-    
+
                 dashboardGrid.innerHTML = `
                     <div class="dashboard-card">
                         <h3>Today's Deliveries</h3>
@@ -760,28 +802,39 @@
                 dashboardGrid.innerHTML = `<p class='text-gray-400'>Error loading dashboard.</p>`;
             });
         }
-    
+
         // Load orders
         async function loadOrders(statusFilter, targetElement, emptyMessage) {
+            if (!window.allowedHostels || window.allowedHostels.length === 0) {
+                targetElement.innerHTML = `<p class='text-gray-400'>No hostels assigned. Please contact the admin.</p>`;
+                showNoHostelsNotification();
+                return;
+            }
+
             const q = query(collection(db, "orders"), where("status", "in", ["being_delivered", "delivered", "not_delivered"]));
             onSnapshot(q, async (snapshot) => {
                 const orders = snapshot.docs
                     .map(doc => ({ id: doc.id, ...doc.data() }))
-                    .filter(order => statusFilter(order.status))
+                    .filter(order => {
+                        return statusFilter(order.status) && 
+                               order.deliveryDetails && 
+                               order.deliveryDetails.hostel && 
+                               window.allowedHostels.includes(order.deliveryDetails.hostel);
+                    })
                     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
+
                 if (!orders.length) {
                     targetElement.innerHTML = `<p class='text-gray-400'>${emptyMessage}</p>`;
                     return;
                 }
-    
+
                 targetElement.innerHTML = '';
                 for (const order of orders) {
                     const items = order.items.map(item => `${item.quantity}x ${item.name}`).join(", ");
                     const deliveryDetails = order.deliveryDetails || {};
                     const statusText = order.status === "delivered" ? "Delivered" : order.status === "not_delivered" ? "Not Delivered" : "In Transit";
                     const statusClass = order.status === "delivered" ? "status" : order.status === "not_delivered" ? "status not-delivered" : "status";
-    
+
                     let restaurantName = order.restaurantName || "Unknown Restaurant";
                     if (order.restaurantId && !order.restaurantName) {
                         try {
@@ -794,7 +847,7 @@
                             console.error("Error fetching restaurant name:", error);
                         }
                     }
-    
+
                     const card = document.createElement("div");
                     card.className = "order-card";
                     card.innerHTML = `
@@ -821,7 +874,7 @@
                 targetElement.innerHTML = `<p class='text-gray-400'>Error loading data.</p>`;
             });
         }
-    
+
         // Fast status updates
         async function markOrderAsDelivered(orderId) {
             try {
@@ -833,7 +886,7 @@
                 showNotification("Couldn't update the status right now", "error");
             }
         }
-    
+
         async function markOrderAsNotDelivered(orderId) {
             try {
                 const orderRef = doc(db, "orders", orderId);
@@ -844,7 +897,7 @@
                 showNotification("Couldn't update the status right now", "error");
             }
         }
-    
+
         // Event delegation for button clicks
         deliveryList.addEventListener("click", (e) => {
             const target = e.target;
@@ -856,7 +909,7 @@
                 if (orderId) markOrderAsNotDelivered(orderId);
             }
         });
-    
+
         // Immediate auth check with deliveryMapping
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -865,6 +918,9 @@
                     loadingScreen.style.display = "none";
                     loginSection.style.display = "none";
                     mainContent.classList.remove("hidden");
+                    if (window.allowedHostels.length === 0) {
+                        showNoHostelsNotification();
+                    }
                     loadDashboard();
                     loadOrders(s => s === "being_delivered", deliveryList, "No active deliveries.");
                     loadOrders(s => s === "delivered" || s === "not_delivered", deliveredList, "No completed deliveries.");
@@ -881,12 +937,12 @@
                 mainContent.classList.add("hidden");
             }
         });
-    
+
         // Force update handler
         document.getElementById("force-update-btn").addEventListener("click", () => {
             location.reload(true);
         });
-    
+
         // Login handler with deliveryMapping check
         document.getElementById("login-form").addEventListener("submit", async (e) => {
             e.preventDefault();
@@ -897,13 +953,13 @@
             const loginBtn = document.getElementById("login-btn");
             const spinner = loginBtn.querySelector(".loading-spinner");
             const btnText = loginBtn.querySelector("span");
-    
+
             console.log("Login attempt with email:", email);
             emailError.classList.remove("show");
             passwordError.classList.remove("show");
             document.getElementById("email").classList.remove("error");
             document.getElementById("password").classList.remove("error");
-    
+
             if (!email) {
                 emailError.textContent = "Please enter your email";
                 emailError.classList.add("show");
@@ -932,11 +988,11 @@
                 showLoginNotification("Your password is too short", "error", "lock");
                 return;
             }
-    
+
             loginBtn.disabled = true;
             btnText.textContent = "Logging in...";
             spinner.classList.add("show");
-    
+
             try {
                 await signInWithEmailAndPassword(auth, email, password);
                 const isAuthorized = await isAuthorizedDeliveryUser(email);
@@ -948,11 +1004,14 @@
                 loginSection.style.display = "none";
                 mainContent.classList.remove("hidden");
                 showLoginNotification("Welcome back! You're logged in", "success", "check-circle");
+                if (window.allowedHostels.length === 0) {
+                    showNoHostelsNotification();
+                }
             } catch (error) {
                 console.error("Login error:", error.code, error.message);
                 let errorMessage = "Something went wrong. Let's try again.";
                 let icon = "exclamation-circle";
-    
+
                 if (error.message === "unauthorized") {
                     errorMessage = "This account is not authorized for the delivery portal";
                     icon = "ban";
@@ -979,7 +1038,7 @@
                             break;
                     }
                 }
-    
+
                 showLoginNotification(errorMessage, "error", icon);
                 document.getElementById("password").value = "";
                 document.getElementById("password").focus();
@@ -989,7 +1048,7 @@
                 spinner.classList.remove("show");
             }
         });
-    
+
         // Password visibility toggle
         document.querySelector(".password-toggle").addEventListener("click", function() {
             const passwordInput = document.getElementById("password");
@@ -1004,7 +1063,7 @@
                 icon.classList.add("fa-eye");
             }
         });
-    
+
         // Auto-focus email field
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
@@ -1014,36 +1073,36 @@
             });
         });
         observer.observe(loginSection, { attributes: true });
-    
+
         // Handle Enter key for login
         document.getElementById("password").addEventListener("keypress", (e) => {
             if (e.key === "Enter") {
                 document.getElementById("login-form").dispatchEvent(new Event("submit"));
             }
         });
-    
+
         // Logout handler
         document.getElementById("logout-btn").addEventListener("click", async () => {
             await signOut(auth);
             showNotification("You've been logged out. See you soon!");
         });
-    
+
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(regs => {
                 for (let reg of regs) reg.update();
             });
         }
-    
+
         // Navigation handlers
         document.getElementById("dashboard-btn").addEventListener("click", () => { toggleSection("dashboard"); loadDashboard(); });
         document.getElementById("delivery-btn").addEventListener("click", () => toggleSection("delivery"));
         document.getElementById("delivered-btn").addEventListener("click", () => toggleSection("delivered"));
         document.getElementById("settings-btn").addEventListener("click", () => toggleSection("settings"));
-    
+
         // Ensure loading screen is visible
         document.addEventListener("DOMContentLoaded", () => {});
     </script>
     
     <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'92b388da784db063',t:'MTc0Mzc5ODMyMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'92b3b6c9ddc7dd25',t:'MTc0MzgwMDIwMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'92b3b6c9ddc7dd25',t:'MTc0MzgwMDIwMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93076277ebfa69b9',t:'MTc0NDY3NzU1My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
