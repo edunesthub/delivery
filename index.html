@@ -22,7 +22,7 @@
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 60px 20px;
+            padding: 20px 10px;
         }
         .header {
             text-align: center;
@@ -43,14 +43,7 @@
             position: relative;
             z-index: 1;
         }
-        .subtitle {
-            font-size: 1.5rem;
-            opacity: 0.7;
-            margin-top: 16px;
-            font-weight: 300;
-            letter-spacing: 0.5px;
-            transform: translateY(-35px);
-        }
+        
         .section {
             background: #252527;
             border-radius: 30px;
@@ -70,49 +63,108 @@
             color: #ffffff;
             letter-spacing: -0.8px;
         }
-        #dashboard h2, #delivery h2, #delivered h2, #settings h2 {
+        #dashboard h2, #delivered h2, #settings h2 {
             font-size: 25px;
             text-align: center;
         }
+        #delivery {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #1c1c1e;
+    border-radius: 0;
+    padding: 20px 15px;
+    box-shadow: none;
+    overflow-y: auto;
+    z-index: 1000;
+    transform: none !important; /* Override any transform */
+}
+
+    #delivery h2 {
+    font-size: 1.8rem;
+    text-align: center;
+    font-weight: 400;
+    transform: translateY(10px);
+}
+
+
+    #delivery-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    #delivered {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #1c1c1e;
+    border-radius: 0;
+    padding: 20px 15px;
+    box-shadow: none;
+    overflow-y: auto;
+    z-index: 1000;
+    transform: none !important; /* Override any transform */
+    padding-bottom: 90px; /* 👈 Add this */
+}
+
+    #delivered h2 {
+    font-size: 1.8rem;
+    text-align: center;
+    font-weight: 400;
+    transform: translateY(10px);
+}
+
+    #delivered-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
         .order-card {
-            background: #2c2c2e;
-            border-radius: 20px;
-            padding: 30px;
-            margin-bottom: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
+        background: #2c2c2e;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
         .order-card p {
-            margin: 12px 0;
-            font-size: 1.25rem;
-            opacity: 0.9;
-            line-height: 1.6;
-        }
-        .order-card .status {
-            font-weight: 600;
-            color: #34c759;
-        }
-        .order-card .status.not-delivered {
-            color: #ff3b30;
-        }
-        .btn {
-            background: #007aff;
-            color: #fff;
-            padding: 14px 28px;
-            border-radius: 14px;
-            font-weight: 500;
-            text-align: center;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-            font-size: 1.1rem;
-            width: 100%;
-            max-width: 300px;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
+        margin: 6px 0;
+        font-size: 0.95rem;
+        opacity: 0.9;
+        line-height: 1.4;
+    }
+    .order-card .status {
+        font-weight: 600;
+        color: #34c759;
+        font-size: 0.9rem;
+    }
+    .order-card .status.not-delivered {
+        color: #ff3b30;
+    }
+    .btn {
+        background: #007aff;
+        color: #fff;
+        padding: 14px 28px;
+        border-radius: 14px;
+        font-weight: 500;
+        text-emphasis: center;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        font-size: 1.1rem;
+        width: 100%;
+        max-width: 300px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
         .btn:disabled {
             opacity: 0.7;
             cursor: not-allowed;
@@ -239,6 +291,19 @@
             .footer-nav button span {
                 font-size: 0.75rem;
             }
+            #delivery {
+            padding: 15px 10px;
+            padding-bottom: 90px; /* 👈 Add this */
+        }
+        
+
+        .order-card {
+            padding: 12px;
+        }
+        .order-card p {
+            font-size: 0.9rem;
+        }
+        
         }
         @media (max-width: 480px) {
             .footer-nav {
@@ -260,6 +325,20 @@
             .footer-nav button.active {
                 transform: translateY(-1px);
             }
+            #delivery {
+            padding: 10px 8px;
+            padding-bottom: 90px; /* 👈 Add this */
+        }
+       
+
+        .order-card {
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+        .order-card p {
+            font-size: 0.85rem;
+        }
+        
         }
         @media (max-width: 360px) {
             .footer-nav {
@@ -417,7 +496,7 @@
         @media (max-width: 768px) {
             .container { padding: 40px 15px; }
             .header h1 { font-size: 3.5rem; }
-            .subtitle { font-size: 1.25rem; }
+         
             h2 { font-size: 2.5rem; }
             .section { padding: 30px; }
             .order-card { padding: 25px; }
@@ -433,10 +512,10 @@
             .header h1 {
                 font-size: 2.3rem;
                 text-align: center;
-                margin-bottom: 40px;
+               
                 transform: translateY(-10px);
             }
-            .subtitle { font-size: 1rem; }
+         
             h2 { font-size: 3rem; }
             .order-card p { font-size: 1rem; }
             .btn { padding: 12px 24px; font-size: 1rem; }
@@ -522,7 +601,7 @@
 <body>
     <!-- Loading screen with "Chawp" centered -->
     <div id="loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1c1c1e; display: flex; align-items: center; justify-content: center; z-index: 3000;">
-        <h1 style="font-size: 3rem; font-weight: 600; letter-spacing: -2px; background: linear-gradient(45deg, #007aff, #34c759, #007aff); -webkit-background-clip: text; background-clip: text; color: transparent;">Chawp</h1>
+        <h1 style="font-size: 3rem; font-weight: 600; letter-spacing: -2px; background: linear-gradient(45deg, #007aff, #34c759, #007aff); -webkit-background-clip: text; background-clip: text; color: transparent;">CHAWP</h1>
     </div>
 
     <!-- Notification element -->
@@ -560,7 +639,6 @@
     <div id="main-content" class="container hidden">
         <div class="header">
             <h1>Chawp Delivery</h1>
-            <p class="subtitle">Your command center for seamless deliveries</p>
         </div>
 
         <!-- Dashboard Section -->
@@ -570,13 +648,13 @@
         </div>
 
         <div id="delivery" class="section hidden">
-            <h2>Active Deliveries</h2><br>
+            <h2><u>Active Deliveries</u></h2><br>
             <div id="delivery-list">Loading delivery orders...</div>
         </div>
 
         <div id="delivered" class="section hidden">
-            <h2>Delivery Status</h2><br>
-            <div id="delivered-list">Loading delivery status...</div>
+            <h2><u>Delivery History</u></h2><br>
+            <div id="delivered-list">Loading delivery history...</div>
         </div>
 
         <div id="settings" class="section hidden">
@@ -594,9 +672,9 @@
                 <i class="fas fa-motorcycle"></i>
                 <span>Delivery</span>
             </button>
-            <button id="delivered-btn" aria-label="Delivery Status">
-                <i class="fas fa-check-circle"></i>
-                <span>Status</span>
+            <button id="delivered-btn" aria-label="Delivery History">
+                <i class="fas fa-history"></i>
+                <span>History</span>
             </button>
             <button id="settings-btn" aria-label="Settings">
                 <i class="fas fa-cog"></i>
@@ -804,15 +882,16 @@
         }
 
         // Load orders
-        async function loadOrders(statusFilter, targetElement, emptyMessage) {
-            if (!window.allowedHostels || window.allowedHostels.length === 0) {
-                targetElement.innerHTML = `<p class='text-gray-400'>No hostels assigned. Please contact the admin.</p>`;
-                showNoHostelsNotification();
-                return;
-            }
+    async function loadOrders(statusFilter, targetElement, emptyMessage) {
+        if (!window.allowedHostels || window.allowedHostels.length === 0) {
+            targetElement.innerHTML = `<p class='text-gray-400'>No hostels assigned. Please contact the admin.</p>`;
+            showNoHostelsNotification();
+            return;
+        }
 
-            const q = query(collection(db, "orders"), where("status", "in", ["being_delivered", "delivered", "not_delivered"]));
-            onSnapshot(q, async (snapshot) => {
+        const q = query(collection(db, "orders"), where("status", "in", ["being_delivered", "delivered", "not_delivered"]));
+        onSnapshot(q, async (snapshot) => {
+            try {
                 const orders = snapshot.docs
                     .map(doc => ({ id: doc.id, ...doc.data() }))
                     .filter(order => {
@@ -821,16 +900,20 @@
                                order.deliveryDetails.hostel && 
                                window.allowedHostels.includes(order.deliveryDetails.hostel);
                     })
-                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    .sort((a, b) => {
+                        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+                        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+                        return timeA - timeB; // Ascending order for oldest first
+                    });
 
                 if (!orders.length) {
                     targetElement.innerHTML = `<p class='text-gray-400'>${emptyMessage}</p>`;
                     return;
                 }
 
-                targetElement.innerHTML = '';
+                targetElement.innerHTML = ''; // Clear existing content
                 for (const order of orders) {
-                    const items = order.items.map(item => `${item.quantity}x ${item.name}`).join(", ");
+                    const items = order.items?.map(item => `${item.quantity}x ${item.name}`).join(", ") || "No items";
                     const deliveryDetails = order.deliveryDetails || {};
                     const statusText = order.status === "delivered" ? "Delivered" : order.status === "not_delivered" ? "Not Delivered" : "In Transit";
                     const statusClass = order.status === "delivered" ? "status" : order.status === "not_delivered" ? "status not-delivered" : "status";
@@ -851,13 +934,11 @@
                     const card = document.createElement("div");
                     card.className = "order-card";
                     card.innerHTML = `
-                        <p style="font-size: 1.5rem; font-weight: 600;"><strong>Restaurant:</strong> ${restaurantName}</p><hr>
-                        <p style="font-size: 1.5rem; font-weight: 600;"><strong>Hostel:</strong> ${deliveryDetails.hostel || "N/A"}</p>
-                        <p style="font-size: 1.5rem; font-weight: 600;"><strong>Room:</strong> ${deliveryDetails.location || "N/A"}</p>
-                        <p style="font-size: 1.5rem; font-weight: 600;"><strong>Contact:</strong> ${deliveryDetails.contactNumber || "N/A"}</p>
-                        <p style="font-size: 1.5rem; font-weight: 600;"><strong>Items:</strong> ${items}</p>
-                        <p><strong>Note:</strong> ${deliveryDetails.deliveryNotes || "None"}</p>
-                        <p><strong>Time:</strong> ${new Date(order.timestamp).toLocaleString()}</p>
+                        <p style="font-size: 1.2rem; font-weight: 600;"><strong>Restaurant:</strong> ${restaurantName}</p><hr>
+                        <p style="font-size: 1.2rem; font-weight: 600;"><strong>Hostel:</strong> ${deliveryDetails.hostel || "N/A"}&nbsp; <strong>Room:</strong> ${deliveryDetails.location || "N/A"}</p>
+                        <p style="font-size: 1.2rem; font-weight: 600;"><strong>Contact:</strong> ${deliveryDetails.contactNumber || "N/A"}</p>
+                        <p style="font-size: 1.2rem; font-weight: 600;"><strong>Items:</strong> ${items}</p>
+                        <p><strong>Time:</strong> ${order.timestamp ? new Date(order.timestamp).toLocaleString() : "N/A"}</p>
                         ${order.status === "being_delivered" ? "" : `<p><strong>ID:</strong> ${order.id}</p>`}
                         <p><strong>Status:</strong> <span class="${statusClass}">${statusText}</span></p>
                         ${order.status === "being_delivered" ? `
@@ -869,11 +950,17 @@
                     `;
                     targetElement.appendChild(card);
                 }
-            }, (error) => {
-                showNotification("Error loading data!", "error");
-                targetElement.innerHTML = `<p class='text-gray-400'>Error loading data.</p>`;
-            });
-        }
+            } catch (error) {
+                console.error("Error processing orders:", error);
+                showNotification("Error loading orders!", "error");
+                targetElement.innerHTML = `<p class='text-gray-400'>Error loading orders.</p>`;
+            }
+        }, (error) => {
+            console.error("Snapshot error:", error);
+            showNotification("Error loading data!", "error");
+            targetElement.innerHTML = `<p class='text-gray-400'>Error loading data.</p>`;
+        });
+    }
 
         // Fast status updates
         async function markOrderAsDelivered(orderId) {
