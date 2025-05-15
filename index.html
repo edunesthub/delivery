@@ -597,6 +597,20 @@
             color: #ff3b30;
         }
     </style>
+
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "7304f21d-769a-4499-bbf3-faeb153cea28",
+      safari_web_id: "web.onesignal.auto.012c2ba4-f65b-47d9-b245-c87f55979016",
+      notifyButton: {
+        enable: true,
+      },
+    });
+  });
+</script>
 </head>
 <body>
     <!-- Loading screen with "Chawp" centered -->
