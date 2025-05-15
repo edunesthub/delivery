@@ -1004,59 +1004,58 @@ async function loadOrders(statusFilter, targetElement, emptyMessage) {
                     audio.play().catch(e => console.log("Audio play failed:", e));
 
                     // In-app notification
-                    if (newDeliveries.length === 1) {
-                        const order = newDeliveries[0];
-                        const hostel = order.deliveryDetails?.hostel || "Unknown";
-                        showNotification(`New delivery for ${hostel}!`, "success", "motorcycle");
-                    } else {
-                        showNotification(`${newDeliveries.length} new deliveries assigned!`, "success", "motorcycle");
-                    }
+if (newDeliveries.length === 1) {
+    const order = newDeliveries[0];
+    const restaurant = order.restaurantName || "Unknown Restaurant";
+    showNotification(`New delivery from ${restaurant}!`, "success", "motorcycle");
+} else {
+    showNotification(`${newDeliveries.length} new deliveries assigned!`, "success", "motorcycle");
+}
 
-                    // Browser notification if supported
-                    if ("Notification" in window && Notification.permission === "granted") {
-                        if (newDeliveries.length === 1) {
-                            const order = newDeliveries[0];
-                            const hostel = order.deliveryDetails?.hostel || "Unknown";
-                            const room = order.deliveryDetails?.location || "N/A";
-                            new Notification("New Chawp Delivery", {
-                                body: `New delivery for ${hostel}, Room: ${room}`,
-                                icon: "/favicon.ico"
-                            });
-                        } else {
-                            new Notification("New Chawp Deliveries", {
-                                body: `You have ${newDeliveries.length} new deliveries waiting!`,
-                                icon: "/favicon.ico"
-                            });
-                        }
-                    }
+// Browser notification if supported
+if ("Notification" in window && Notification.permission === "granted") {
+    if (newDeliveries.length === 1) {
+        const order = newDeliveries[0];
+        const restaurant = order.restaurantName || "Unknown Restaurant";
+        new Notification("New Chawp Delivery", {
+            body: `New delivery from ${restaurant}`,
+            icon: "/favicon.ico"
+        });
+    } else {
+        new Notification("New Chawp Deliveries", {
+            body: `You have ${newDeliveries.length} new deliveries waiting!`,
+            icon: "/favicon.ico"
+        });
+    }
+}
 
-                    // --- OneSignal push notification for new deliveries ---
-                    if (window.OneSignal && auth.currentUser && auth.currentUser.email) {
-                        fetch("https://onesignal.com/api/v1/notifications", {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Authorization": "os_v2_app_omcpehlwtjcjto7t7lvrkphkfarkwx76a7belynntbe6w42hmfr24dqi46d6yu3rrrkbgexs6qoabvlamkqaxupo4aijsdofwg3aq5y"
-                            },
-                            body: JSON.stringify({
-                                app_id: "7304f21d-769a-4499-bbf3-faeb153cea28",
-                                headings: { "en": "New Delivery Assigned!" },
-                                contents: { "en": newDeliveries.length === 1 
-                                    ? `New delivery for ${newDeliveries[0].deliveryDetails?.hostel || "Unknown"}`
-                                    : `${newDeliveries.length} new deliveries assigned!`
-                                },
-                                include_external_user_ids: [auth.currentUser.email]
-                            })
-                        })
-                        .then(r => r.json())
-                        .then(data => {
-                            console.log("OneSignal push sent:", data);
-                        })
-                        .catch(e => {
-                            console.error("OneSignal push error:", e);
-                        });
-                    }
-                    // --- end OneSignal push ---
+// --- OneSignal push notification for new deliveries ---
+if (window.OneSignal && auth.currentUser && auth.currentUser.email) {
+    fetch("https://onesignal.com/api/v1/notifications", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "os_v2_app_omcpehlwtjcjto7t7lvrkphkfarkwx76a7belynntbe6w42hmfr24dqi46d6yu3rrrkbgexs6qoabvlamkqaxupo4aijsdofwg3aq5y"
+        },
+        body: JSON.stringify({
+            app_id: "7304f21d-769a-4499-bbf3-faeb153cea28",
+            headings: { "en": "New Delivery Assigned!" },
+            contents: { "en": newDeliveries.length === 1 
+                ? `New delivery from ${newDeliveries[0].restaurantName || "Unknown Restaurant"}`
+                : `${newDeliveries.length} new deliveries assigned!`
+            },
+            include_external_user_ids: [auth.currentUser.email]
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        console.log("OneSignal push sent:", data);
+    })
+    .catch(e => {
+        console.error("OneSignal push error:", e);
+    });
+}
+// --- end OneSignal push ---
                 }
 
                 // Update our tracking of active deliveries
