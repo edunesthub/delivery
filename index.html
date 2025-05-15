@@ -699,509 +699,684 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-        import { 
-            getFirestore, collection, query, where, onSnapshot, doc, updateDoc, getDoc
-        } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
-        import { 
-            getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+import { 
+    getFirestore, collection, query, where, onSnapshot, doc, updateDoc, getDoc
+} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { 
+    getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyADvpUQWo75ExePGoCRirD2mM-lmfM4Cmc",
-            authDomain: "von600-7982d.firebaseapp.com",
-            projectId: "von600-7982d",
-            storageBucket: "von600-7982d.appspot.com",
-            messagingSenderId: "164591218045",
-            appId: "1:164591218045:web:afe17512e16573e7903014",
-            measurementId: "G-E69DMPLXBK"
-        };
+const firebaseConfig = {
+    apiKey: "AIzaSyADvpUQWo75ExePGoCRirD2mM-lmfM4Cmc",
+    authDomain: "von600-7982d.firebaseapp.com",
+    projectId: "von600-7982d",
+    storageBucket: "von600-7982d.appspot.com",
+    messagingSenderId: "164591218045",
+    appId: "1:164591218045:web:afe17512e16573e7903014",
+    measurementId: "G-E69DMPLXBK"
+};
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
-        // Cache DOM elements
-        const loadingScreen = document.getElementById("loading-screen");
-        const loginSection = document.getElementById("login-section");
-        const mainContent = document.getElementById("main-content");
-        const notification = document.getElementById("notification");
-        const dashboardGrid = document.getElementById("dashboard-grid");
-        const deliveryList = document.getElementById("delivery-list");
-        const deliveredList = document.getElementById("delivered-list");
+// Cache DOM elements
+const loadingScreen = document.getElementById("loading-screen");
+const loginSection = document.getElementById("login-section");
+const mainContent = document.getElementById("main-content");
+const notification = document.getElementById("notification");
+const dashboardGrid = document.getElementById("dashboard-grid");
+const deliveryList = document.getElementById("delivery-list");
+const deliveredList = document.getElementById("delivered-list");
 
-        // Store allowed hostels globally
-        window.allowedHostels = null;
+// Store allowed hostels globally
+window.allowedHostels = null;
+// Track active deliveries to detect new ones
+window.activeDeliveryIds = new Set();
 
-        // Enhanced notification function
-        function showNotification(message, type = "success", icon = "check-circle") {
-            console.log("Showing notification:", message, type);
-            let notification = document.getElementById("notification");
-            if (!notification) {
-                notification = document.createElement("div");
-                notification.id = "notification";
-                notification.className = "notification";
-                document.body.appendChild(notification);
-            }
-            notification.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
-            notification.className = `notification ${type} show`;
-            notification.offsetHeight;
-            if (window.notificationTimeout) {
-                clearTimeout(window.notificationTimeout);
-            }
-            window.notificationTimeout = setTimeout(() => {
-                notification.classList.remove("show");
-            }, 4000);
+// Enhanced notification function
+function showNotification(message, type = "success", icon = "check-circle") {
+    console.log("Showing notification:", message, type);
+    let notification = document.getElementById("notification");
+    if (!notification) {
+        notification = document.createElement("div");
+        notification.id = "notification";
+        notification.className = "notification";
+        document.body.appendChild(notification);
+    }
+    notification.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
+    notification.className = `notification ${type} show`;
+    notification.offsetHeight;
+    if (window.notificationTimeout) {
+        clearTimeout(window.notificationTimeout);
+    }
+    window.notificationTimeout = setTimeout(() => {
+        notification.classList.remove("show");
+    }, 4000);
+}
+
+// Show login notification
+function showLoginNotification(message, type = "error", icon = "exclamation-circle") {
+    console.log("Showing login notification:", message, type);
+    const loginNotification = document.getElementById("login-notification");
+    const messageElement = document.getElementById("login-notification-message");
+    if (loginNotification && messageElement) {
+        loginNotification.querySelector("i").className = `fas fa-${icon}`;
+        messageElement.textContent = message;
+        loginNotification.className = `login-notification ${type} show`;
+        if (window.loginNotificationTimeout) {
+            clearTimeout(window.loginNotificationTimeout);
         }
+        window.loginNotificationTimeout = setTimeout(() => {
+            loginNotification.classList.remove("show");
+        }, 5000);
+    }
+}
 
-        // Show login notification
-        function showLoginNotification(message, type = "error", icon = "exclamation-circle") {
-            console.log("Showing login notification:", message, type);
-            const loginNotification = document.getElementById("login-notification");
-            const messageElement = document.getElementById("login-notification-message");
-            if (loginNotification && messageElement) {
-                loginNotification.querySelector("i").className = `fas fa-${icon}`;
-                messageElement.textContent = message;
-                loginNotification.className = `login-notification ${type} show`;
-                if (window.loginNotificationTimeout) {
-                    clearTimeout(window.loginNotificationTimeout);
-                }
-                window.loginNotificationTimeout = setTimeout(() => {
-                    loginNotification.classList.remove("show");
-                }, 5000);
-            }
-        }
-
-        // Show no-hostels notification (persistent, dismissible)
-        function showNoHostelsNotification() {
-            let noHostelsNotification = document.getElementById("no-hostels-notification");
-            if (!noHostelsNotification) {
-                noHostelsNotification = document.createElement("div");
-                noHostelsNotification.id = "no-hostels-notification";
-                noHostelsNotification.className = "notification warning";
-                noHostelsNotification.style.background = "linear-gradient(45deg, #007aff, #34c759)";
-                noHostelsNotification.innerHTML = `
-                    <i class="fas fa-exclamation-circle"></i>
-                    <span>No hostels assigned to your account. Please contact the admin to get started.</span>
-                    <button class="dismiss-btn" style="background: none; border: none; color: #fff; font-size: 1rem; cursor: pointer; margin-left: 10px;">
-                        <i class="fas fa-times"></i>
-                    </button>
-                `;
-                document.body.appendChild(noHostelsNotification);
-                noHostelsNotification.querySelector(".dismiss-btn").addEventListener("click", () => {
-                    noHostelsNotification.classList.remove("show");
-                });
-            }
-            noHostelsNotification.classList.add("show");
-        }
-
-        // Check if user is in deliveryMapping
-        async function isAuthorizedDeliveryUser(email) {
-            try {
-                const deliveryMappingRef = doc(db, "deliveryMapping", email);
-                const deliveryMappingSnap = await getDoc(deliveryMappingRef);
-                if (deliveryMappingSnap.exists()) {
-                    const data = deliveryMappingSnap.data();
-                    window.allowedHostels = data.allowedHostels || [];
-                    return data.isDelivery === true;
-                }
-                window.allowedHostels = [];
-                return false;
-            } catch (error) {
-                console.error("Error checking deliveryMapping:", error);
-                window.allowedHostels = [];
-                return false;
-            }
-        }
-
-        // Efficient section toggling
-        function toggleSection(sectionId) {
-            const sections = ["dashboard", "delivery", "delivered", "settings"];
-            sections.forEach(id => {
-                const section = document.getElementById(id);
-                section.classList.toggle("hidden", id !== sectionId);
-                document.getElementById(`${id}-btn`).classList.toggle("active", id === sectionId);
-            });
-        }
-
-        // Load dashboard data
-        function loadDashboard() {
-            if (!window.allowedHostels || window.allowedHostels.length === 0) {
-                dashboardGrid.innerHTML = `<p class='text-gray-400'>No hostels assigned. Please contact the admin.</p>`;
-                showNoHostelsNotification();
-                return;
-            }
-
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayTimestamp = today.getTime();
-            const tomorrowTimestamp = todayTimestamp + 24 * 60 * 60 * 1000;
-
-            let todaysDeliveries = 0;
-            let activeDeliveries = 0;
-            let completedToday = 0;
-
-            const q = query(collection(db, "orders"), where("status", "in", ["being_delivered", "delivered", "not_delivered"]));
-            onSnapshot(q, (snapshot) => {
-                todaysDeliveries = 0;
-                activeDeliveries = 0;
-                completedToday = 0;
-
-                snapshot.forEach(doc => {
-                    const order = doc.data();
-                    if (!order.deliveryDetails || !order.deliveryDetails.hostel || !window.allowedHostels.includes(order.deliveryDetails.hostel)) {
-                        return;
-                    }
-
-                    const deliveredTimestamp = order.beingDeliveredTimestamp 
-                        ? new Date(order.beingDeliveredTimestamp).getTime()
-                        : new Date(order.timestamp).getTime();
-
-                    if (deliveredTimestamp >= todayTimestamp && deliveredTimestamp < tomorrowTimestamp) {
-                        todaysDeliveries++;
-                    }
-
-                    if (order.status === "being_delivered") {
-                        activeDeliveries++;
-                    }
-
-                    if (order.status === "delivered" && deliveredTimestamp >= todayTimestamp && deliveredTimestamp < tomorrowTimestamp) {
-                        completedToday++;
-                    }
-                });
-
-                const totalAmountToday = completedToday * 5;
-
-                dashboardGrid.innerHTML = `
-                    <div class="dashboard-card">
-                        <h3>Today's Deliveries</h3>
-                        <p>${todaysDeliveries}</p>
-                    </div>
-                    <div class="dashboard-card">
-                        <h3>Completed Today</h3>
-                        <p>${completedToday}</p>
-                    </div>
-                    <div class="dashboard-card">
-                        <h3>Total Amount (Today)</h3>
-                        <p>GH₵${totalAmountToday.toFixed(2)}</p>
-                    </div>
-                    <div class="dashboard-card">
-                        <h3>Active Deliveries</h3>
-                        <p>${activeDeliveries}</p>
-                    </div>
-                `;
-            }, (error) => {
-                console.error("Dashboard error:", error);
-                dashboardGrid.innerHTML = `<p class='text-gray-400'>Error loading dashboard.</p>`;
-            });
-        }
-
-        // Load orders
-    async function loadOrders(statusFilter, targetElement, emptyMessage) {
-        if (!window.allowedHostels || window.allowedHostels.length === 0) {
-            targetElement.innerHTML = `<p class='text-gray-400'>No hostels assigned. Please contact the admin.</p>`;
-            showNoHostelsNotification();
-            return;
-        }
-
-        const q = query(collection(db, "orders"), where("status", "in", ["being_delivered", "delivered", "not_delivered"]));
-        onSnapshot(q, async (snapshot) => {
-            try {
-                const orders = snapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() }))
-                    .filter(order => {
-                        return statusFilter(order.status) && 
-                               order.deliveryDetails && 
-                               order.deliveryDetails.hostel && 
-                               window.allowedHostels.includes(order.deliveryDetails.hostel);
-                    })
-                    .sort((a, b) => {
-                        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-                        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-                        return timeA - timeB; // Ascending order for oldest first
-                    });
-
-                if (!orders.length) {
-                    targetElement.innerHTML = `<p class='text-gray-400'>${emptyMessage}</p>`;
-                    return;
-                }
-
-                targetElement.innerHTML = ''; // Clear existing content
-                for (const order of orders) {
-                    const items = order.items?.map(item => `${item.quantity}x ${item.name}`).join(", ") || "No items";
-                    const deliveryDetails = order.deliveryDetails || {};
-                    const statusText = order.status === "delivered" ? "Delivered" : order.status === "not_delivered" ? "Not Delivered" : "In Transit";
-                    const statusClass = order.status === "delivered" ? "status" : order.status === "not_delivered" ? "status not-delivered" : "status";
-
-                    let restaurantName = order.restaurantName || "Unknown Restaurant";
-                    if (order.restaurantId && !order.restaurantName) {
-                        try {
-                            const restaurantRef = doc(db, "restaurants", order.restaurantId);
-                            const restaurantSnap = await getDoc(restaurantRef);
-                            if (restaurantSnap.exists()) {
-                                restaurantName = restaurantSnap.data().name || "Unknown Restaurant";
-                            }
-                        } catch (error) {
-                            console.error("Error fetching restaurant name:", error);
-                        }
-                    }
-
-                    const card = document.createElement("div");
-                    card.className = "order-card";
-                    card.innerHTML = `
-                        <p style="font-size: 1.2rem; font-weight: 600;"><strong>Restaurant:</strong> ${restaurantName}</p><hr>
-                        <p style="font-size: 1.2rem; font-weight: 600;"><strong>Hostel:</strong> ${deliveryDetails.hostel || "N/A"}&nbsp; <strong>Room:</strong> ${deliveryDetails.location || "N/A"}</p>
-                        <p style="font-size: 1.2rem; font-weight: 600;"><strong>Contact:</strong> ${deliveryDetails.contactNumber || "N/A"}</p>
-                        <p style="font-size: 1.2rem; font-weight: 600;"><strong>Items:</strong> ${items}</p>
-                        <p><strong>Time:</strong> ${order.timestamp ? new Date(order.timestamp).toLocaleString() : "N/A"}</p>
-                        ${order.status === "being_delivered" ? "" : `<p><strong>ID:</strong> ${order.id}</p>`}
-                        <p><strong>Status:</strong> <span class="${statusClass}">${statusText}</span></p>
-                        ${order.status === "being_delivered" ? `
-                            <div class="flex gap-4 mt-6">
-                                <button class="btn btn-edit delivered-btn" data-order-id="${order.id}">Delivered</button>
-                                <button class="btn btn-secondary not-delivered-btn" data-order-id="${order.id}">Not Delivered</button>
-                            </div>
-                        ` : ""}
-                    `;
-                    targetElement.appendChild(card);
-                }
-            } catch (error) {
-                console.error("Error processing orders:", error);
-                showNotification("Error loading orders!", "error");
-                targetElement.innerHTML = `<p class='text-gray-400'>Error loading orders.</p>`;
-            }
-        }, (error) => {
-            console.error("Snapshot error:", error);
-            showNotification("Error loading data!", "error");
-            targetElement.innerHTML = `<p class='text-gray-400'>Error loading data.</p>`;
+// Show no-hostels notification (persistent, dismissible)
+function showNoHostelsNotification() {
+    let noHostelsNotification = document.getElementById("no-hostels-notification");
+    if (!noHostelsNotification) {
+        noHostelsNotification = document.createElement("div");
+        noHostelsNotification.id = "no-hostels-notification";
+        noHostelsNotification.className = "notification warning";
+        noHostelsNotification.style.background = "linear-gradient(45deg, #007aff, #34c759)";
+        noHostelsNotification.innerHTML = `
+            <i class="fas fa-exclamation-circle"></i>
+            <span>No hostels assigned to your account. Please contact the admin to get started.</span>
+            <button class="dismiss-btn" style="background: none; border: none; color: #fff; font-size: 1rem; cursor: pointer; margin-left: 10px;">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        document.body.appendChild(noHostelsNotification);
+        noHostelsNotification.querySelector(".dismiss-btn").addEventListener("click", () => {
+            noHostelsNotification.classList.remove("show");
         });
     }
+    noHostelsNotification.classList.add("show");
+}
 
-        // Fast status updates
-        async function markOrderAsDelivered(orderId) {
-            try {
-                const orderRef = doc(db, "orders", orderId);
-                await updateDoc(orderRef, { status: "delivered" });
-                showNotification("Great job! Order marked as delivered");
-            } catch (error) {
-                console.error("Error updating status:", error);
-                showNotification("Couldn't update the status right now", "error");
-            }
+// Check if user is in deliveryMapping
+async function isAuthorizedDeliveryUser(email) {
+    try {
+        const deliveryMappingRef = doc(db, "deliveryMapping", email);
+        const deliveryMappingSnap = await getDoc(deliveryMappingRef);
+        if (deliveryMappingSnap.exists()) {
+            const data = deliveryMappingSnap.data();
+            window.allowedHostels = data.allowedHostels || [];
+            return data.isDelivery === true;
         }
+        window.allowedHostels = [];
+        return false;
+    } catch (error) {
+        console.error("Error checking deliveryMapping:", error);
+        window.allowedHostels = [];
+        return false;
+    }
+}
 
-        async function markOrderAsNotDelivered(orderId) {
-            try {
-                const orderRef = doc(db, "orders", orderId);
-                await updateDoc(orderRef, { status: "not_delivered" });
-                showNotification("Order marked as not delivered");
-            } catch (error) {
-                console.error("Error updating status:", error);
-                showNotification("Couldn't update the status right now", "error");
+// Efficient section toggling
+function toggleSection(sectionId) {
+    const sections = ["dashboard", "delivery", "delivered", "settings"];
+    sections.forEach(id => {
+        const section = document.getElementById(id);
+        section.classList.toggle("hidden", id !== sectionId);
+        document.getElementById(`${id}-btn`).classList.toggle("active", id === sectionId);
+    });
+}
+
+// Load dashboard data
+function loadDashboard() {
+    if (!window.allowedHostels || window.allowedHostels.length === 0) {
+        dashboardGrid.innerHTML = `<p class='text-gray-400'>No hostels assigned. Please contact the admin.</p>`;
+        showNoHostelsNotification();
+        return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTimestamp = today.getTime();
+    const tomorrowTimestamp = todayTimestamp + 24 * 60 * 60 * 1000;
+
+    let todaysDeliveries = 0;
+    let activeDeliveries = 0;
+    let completedToday = 0;
+
+    const q = query(collection(db, "orders"), where("status", "in", ["being_delivered", "delivered", "not_delivered"]));
+    onSnapshot(q, (snapshot) => {
+        todaysDeliveries = 0;
+        activeDeliveries = 0;
+        completedToday = 0;
+
+        snapshot.forEach(doc => {
+            const order = doc.data();
+            if (!order.deliveryDetails || !order.deliveryDetails.hostel || !window.allowedHostels.includes(order.deliveryDetails.hostel)) {
+                return;
             }
+
+            const deliveredTimestamp = order.beingDeliveredTimestamp 
+                ? new Date(order.beingDeliveredTimestamp).getTime()
+                : new Date(order.timestamp).getTime();
+
+            if (deliveredTimestamp >= todayTimestamp && deliveredTimestamp < tomorrowTimestamp) {
+                todaysDeliveries++;
+            }
+
+            if (order.status === "being_delivered") {
+                activeDeliveries++;
+            }
+
+            if (order.status === "delivered" && deliveredTimestamp >= todayTimestamp && deliveredTimestamp < tomorrowTimestamp) {
+                completedToday++;
+            }
+        });
+
+        const totalAmountToday = completedToday * 5;
+
+        dashboardGrid.innerHTML = `
+            <div class="dashboard-card">
+                <h3>Today's Deliveries</h3>
+                <p>${todaysDeliveries}</p>
+            </div>
+            <div class="dashboard-card">
+                <h3>Completed Today</h3>
+                <p>${completedToday}</p>
+            </div>
+            <div class="dashboard-card">
+                <h3>Total Amount (Today)</h3>
+                <p>GH₵${totalAmountToday.toFixed(2)}</p>
+            </div>
+            <div class="dashboard-card">
+                <h3>Active Deliveries</h3>
+                <p>${activeDeliveries}</p>
+            </div>
+        `;
+    }, (error) => {
+        console.error("Dashboard error:", error);
+        dashboardGrid.innerHTML = `<p class='text-gray-400'>Error loading dashboard.</p>`;
+    });
+}
+
+// Initialize OneSignal
+function initializeOneSignal() {
+    window.OneSignal = window.OneSignal || [];
+    
+    // Check if we're already subscribed
+    OneSignal.push(async function() {
+        const isPushSupported = OneSignal.isPushNotificationsSupported();
+        if (isPushSupported) {
+            // Get subscription state
+            const pushSubscription = await OneSignal.getSubscription();
+            if (!pushSubscription) {
+                // If not subscribed, show a prompt to the user
+                showNotification("Enable notifications to get alerts for new deliveries", "warning", "bell");
+                
+                // Automatically prompt for notification permission
+                setTimeout(() => {
+                    OneSignal.showSlidedownPrompt();
+                }, 3000);
+            } else {
+                console.log("User is already subscribed to push notifications");
+                showNotification("Notifications are enabled for new deliveries", "success", "bell");
+            }
+        } else {
+            console.log("Push notifications are not supported");
+            showNotification("Your browser doesn't support push notifications", "warning", "bell-slash");
         }
-
-        // Event delegation for button clicks
-        deliveryList.addEventListener("click", (e) => {
-            const target = e.target;
-            if (target.classList.contains("delivered-btn")) {
-                const orderId = target.dataset.orderId;
-                if (orderId) markOrderAsDelivered(orderId);
-            } else if (target.classList.contains("not-delivered-btn")) {
-                const orderId = target.dataset.orderId;
-                if (orderId) markOrderAsNotDelivered(orderId);
-            }
+    });
+    
+    // Set OneSignal user ID to be the email (for targeting)
+    if (auth.currentUser && auth.currentUser.email) {
+        OneSignal.push(function() {
+            OneSignal.setExternalUserId(auth.currentUser.email);
         });
+    }
+}
 
-        // Immediate auth check with deliveryMapping
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                const isAuthorized = await isAuthorizedDeliveryUser(user.email);
-                if (isAuthorized) {
-                    loadingScreen.style.display = "none";
-                    loginSection.style.display = "none";
-                    mainContent.classList.remove("hidden");
-                    if (window.allowedHostels.length === 0) {
-                        showNoHostelsNotification();
+// Function to send a test notification
+function sendTestNotification() {
+    fetch("https://onesignal.com/api/v1/notifications", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Basic YOUR_REST_API_KEY"  // Replace with your actual REST API key
+        },
+        body: JSON.stringify({
+            app_id: "7304f21d-769a-4499-bbf3-faeb153cea28",
+            contents: {"en": "You have a test notification from Chawp!"},
+            headings: {"en": "New Delivery Test"},
+            // Send to this specific user (use this if sending from your backend)
+            // include_external_user_ids: [auth.currentUser.email],
+            included_segments: ["All"]  // Send to all subscribers for testing
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log("Notification sent:", data);
+        showNotification("Test notification sent!", "success", "check-circle");
+    })
+    .catch(error => {
+        console.error("Error sending notification:", error);
+        showNotification("Couldn't send test notification", "error", "exclamation-circle");
+    });
+}
+
+// Load orders with OneSignal integration
+async function loadOrders(statusFilter, targetElement, emptyMessage) {
+    if (!window.allowedHostels || window.allowedHostels.length === 0) {
+        targetElement.innerHTML = `<p class='text-gray-400'>No hostels assigned. Please contact the admin.</p>`;
+        showNoHostelsNotification();
+        return;
+    }
+
+    const q = query(collection(db, "orders"), where("status", "in", ["being_delivered", "delivered", "not_delivered"]));
+    onSnapshot(q, async (snapshot) => {
+        try {
+            const newActiveDeliveryIds = new Set();
+            const newDeliveries = [];
+            
+            const orders = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter(order => {
+                    return statusFilter(order.status) && 
+                           order.deliveryDetails && 
+                           order.deliveryDetails.hostel && 
+                           window.allowedHostels.includes(order.deliveryDetails.hostel);
+                })
+                .sort((a, b) => {
+                    const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+                    const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+                    return timeA - timeB; // Ascending order for oldest first
+                });
+
+            // For active deliveries, check for new ones
+            if (statusFilter(order => order === "being_delivered")) {
+                orders.forEach(order => {
+                    newActiveDeliveryIds.add(order.id);
+                    
+                    // If we haven't seen this order before, it's new
+                    if (!window.activeDeliveryIds.has(order.id)) {
+                        newDeliveries.push(order);
                     }
-                    loadDashboard();
-                    loadOrders(s => s === "being_delivered", deliveryList, "No active deliveries.");
-                    loadOrders(s => s === "delivered" || s === "not_delivered", deliveredList, "No completed deliveries.");
-                } else {
-                    await signOut(auth);
-                    loadingScreen.style.display = "none";
-                    loginSection.style.display = "flex";
-                    mainContent.classList.add("hidden");
-                    showLoginNotification("This account is not authorized for the delivery portal", "error", "ban");
-                }
-            } else {
-                loadingScreen.style.display = "none";
-                loginSection.style.display = "flex";
-                mainContent.classList.add("hidden");
-            }
-        });
-
-        // Force update handler
-        document.getElementById("force-update-btn").addEventListener("click", () => {
-            location.reload(true);
-        });
-
-        // Login handler with deliveryMapping check
-        document.getElementById("login-form").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const email = document.getElementById("email").value;
-            const password = document.getElementById("password").value;
-            const emailError = document.getElementById("email-error");
-            const passwordError = document.getElementById("password-error");
-            const loginBtn = document.getElementById("login-btn");
-            const spinner = loginBtn.querySelector(".loading-spinner");
-            const btnText = loginBtn.querySelector("span");
-
-            console.log("Login attempt with email:", email);
-            emailError.classList.remove("show");
-            passwordError.classList.remove("show");
-            document.getElementById("email").classList.remove("error");
-            document.getElementById("password").classList.remove("error");
-
-            if (!email) {
-                emailError.textContent = "Please enter your email";
-                emailError.classList.add("show");
-                document.getElementById("email").classList.add("error");
-                showLoginNotification("Please enter your email address", "error", "envelope");
-                return;
-            }
-            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                emailError.textContent = "This email address doesn't look right";
-                emailError.classList.add("show");
-                document.getElementById("email").classList.add("error");
-                showLoginNotification("Hmm, that doesn't look like a valid email", "error", "envelope");
-                return;
-            }
-            if (!password) {
-                passwordError.textContent = "Please enter your password";
-                passwordError.classList.add("show");
-                document.getElementById("password").classList.add("error");
-                showLoginNotification("Don't forget your password!", "error", "lock");
-                return;
-            }
-            if (password.length < 6) {
-                passwordError.textContent = "Your password needs to be at least 6 characters";
-                passwordError.classList.add("show");
-                document.getElementById("password").classList.add("error");
-                showLoginNotification("Your password is too short", "error", "lock");
-                return;
-            }
-
-            loginBtn.disabled = true;
-            btnText.textContent = "Logging in...";
-            spinner.classList.add("show");
-
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                const isAuthorized = await isAuthorizedDeliveryUser(email);
-                if (!isAuthorized) {
-                    await signOut(auth);
-                    throw new Error("unauthorized");
-                }
-                loadingScreen.style.display = "none";
-                loginSection.style.display = "none";
-                mainContent.classList.remove("hidden");
-                showLoginNotification("Welcome back! You're logged in", "success", "check-circle");
-                if (window.allowedHostels.length === 0) {
-                    showNoHostelsNotification();
-                }
-            } catch (error) {
-                console.error("Login error:", error.code, error.message);
-                let errorMessage = "Something went wrong. Let's try again.";
-                let icon = "exclamation-circle";
-
-                if (error.message === "unauthorized") {
-                    errorMessage = "This account is not authorized for the delivery portal";
-                    icon = "ban";
-                } else {
-                    switch (error.code) {
-                        case "auth/user-not-found":
-                            errorMessage = "We couldn't find an account with this email";
-                            icon = "user-times";
-                            break;
-                        case "auth/wrong-password":
-                            errorMessage = "Oops! That password doesn't match our records";
-                            icon = "lock";
-                            break;
-                        case "auth/too-many-requests":
-                            errorMessage = "Too many attempts. Please take a short break and try again";
-                            icon = "clock";
-                            break;
-                        case "auth/network-request-failed":
-                            errorMessage = "Can't connect right now. Check your internet connection";
-                            icon = "wifi";
-                            break;
-                        default:
-                            errorMessage = "Wrong password or email. Please try again.";
-                            break;
+                });
+                
+                // Handle notifications for new deliveries
+                if (newDeliveries.length > 0) {
+                    // Play a sound for new deliveries
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    audio.play().catch(e => console.log("Audio play failed:", e));
+                    
+                    // Local notification
+                    if (newDeliveries.length === 1) {
+                        const order = newDeliveries[0];
+                        const hostel = order.deliveryDetails?.hostel || "Unknown";
+                        showNotification(`New delivery for ${hostel}!`, "success", "motorcycle");
+                    } else {
+                        showNotification(`${newDeliveries.length} new deliveries assigned!`, "success", "motorcycle");
+                    }
+                    
+                    // Browser notification if supported
+                    if ("Notification" in window && Notification.permission === "granted") {
+                        if (newDeliveries.length === 1) {
+                            const order = newDeliveries[0];
+                            const hostel = order.deliveryDetails?.hostel || "Unknown";
+                            const room = order.deliveryDetails?.location || "N/A";
+                            
+                            new Notification("New Chawp Delivery", {
+                                body: `New delivery for ${hostel}, Room: ${room}`,
+                                icon: "/favicon.ico"
+                            });
+                        } else {
+                            new Notification("New Chawp Deliveries", {
+                                body: `You have ${newDeliveries.length} new deliveries waiting!`,
+                                icon: "/favicon.ico"
+                            });
+                        }
                     }
                 }
-
-                showLoginNotification(errorMessage, "error", icon);
-                document.getElementById("password").value = "";
-                document.getElementById("password").focus();
-            } finally {
-                loginBtn.disabled = false;
-                btnText.textContent = "Login";
-                spinner.classList.remove("show");
+                
+                // Update our tracking of active deliveries
+                window.activeDeliveryIds = newActiveDeliveryIds;
             }
-        });
 
-        // Password visibility toggle
-        document.querySelector(".password-toggle").addEventListener("click", function() {
-            const passwordInput = document.getElementById("password");
-            const icon = this.querySelector("i");
-            if (passwordInput.type === "password") {
-                passwordInput.type = "text";
-                icon.classList.remove("fa-eye");
-                icon.classList.add("fa-eye-slash");
-            } else {
-                passwordInput.type = "password";
-                icon.classList.remove("fa-eye-slash");
-                icon.classList.add("fa-eye");
+            if (!orders.length) {
+                targetElement.innerHTML = `<p class='text-gray-400'>${emptyMessage}</p>`;
+                return;
             }
-        });
 
-        // Auto-focus email field
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.attributeName === "style" && loginSection.style.display === "flex") {
-                    document.getElementById("email").focus();
+            targetElement.innerHTML = ''; // Clear existing content
+            for (const order of orders) {
+                const items = order.items?.map(item => `${item.quantity}x ${item.name}`).join(", ") || "No items";
+                const deliveryDetails = order.deliveryDetails || {};
+                const statusText = order.status === "delivered" ? "Delivered" : order.status === "not_delivered" ? "Not Delivered" : "In Transit";
+                const statusClass = order.status === "delivered" ? "status" : order.status === "not_delivered" ? "status not-delivered" : "status";
+
+                let restaurantName = order.restaurantName || "Unknown Restaurant";
+                if (order.restaurantId && !order.restaurantName) {
+                    try {
+                        const restaurantRef = doc(db, "restaurants", order.restaurantId);
+                        const restaurantSnap = await getDoc(restaurantRef);
+                        if (restaurantSnap.exists()) {
+                            restaurantName = restaurantSnap.data().name || "Unknown Restaurant";
+                        }
+                    } catch (error) {
+                        console.error("Error fetching restaurant name:", error);
+                    }
                 }
-            });
-        });
-        observer.observe(loginSection, { attributes: true });
 
-        // Handle Enter key for login
-        document.getElementById("password").addEventListener("keypress", (e) => {
-            if (e.key === "Enter") {
-                document.getElementById("login-form").dispatchEvent(new Event("submit"));
+                const card = document.createElement("div");
+                card.className = "order-card";
+                card.innerHTML = `
+                    <p style="font-size: 1.2rem; font-weight: 600;"><strong>Restaurant:</strong> ${restaurantName}</p><hr>
+                    <p style="font-size: 1.2rem; font-weight: 600;"><strong>Hostel:</strong> ${deliveryDetails.hostel || "N/A"}&nbsp; <strong>Room:</strong> ${deliveryDetails.location || "N/A"}</p>
+                    <p style="font-size: 1.2rem; font-weight: 600;"><strong>Contact:</strong> ${deliveryDetails.contactNumber || "N/A"}</p>
+                    <p style="font-size: 1.2rem; font-weight: 600;"><strong>Items:</strong> ${items}</p>
+                    <p><strong>Time:</strong> ${order.timestamp ? new Date(order.timestamp).toLocaleString() : "N/A"}</p>
+                    ${order.status === "being_delivered" ? "" : `<p><strong>ID:</strong> ${order.id}</p>`}
+                    <p><strong>Status:</strong> <span class="${statusClass}">${statusText}</span></p>
+                    ${order.status === "being_delivered" ? `
+                        <div class="flex gap-4 mt-6">
+                            <button class="btn btn-edit delivered-btn" data-order-id="${order.id}">Delivered</button>
+                            <button class="btn btn-secondary not-delivered-btn" data-order-id="${order.id}">Not Delivered</button>
+                        </div>
+                    ` : ""}
+                `;
+                targetElement.appendChild(card);
             }
-        });
+        } catch (error) {
+            console.error("Error processing orders:", error);
+            showNotification("Error loading orders!", "error");
+            targetElement.innerHTML = `<p class='text-gray-400'>Error loading orders.</p>`;
+        }
+    }, (error) => {
+        console.error("Snapshot error:", error);
+        showNotification("Error loading data!", "error");
+        targetElement.innerHTML = `<p class='text-gray-400'>Error loading data.</p>`;
+    });
+}
 
-        // Logout handler
-        document.getElementById("logout-btn").addEventListener("click", async () => {
+// Fast status updates
+async function markOrderAsDelivered(orderId) {
+    try {
+        const orderRef = doc(db, "orders", orderId);
+        await updateDoc(orderRef, { status: "delivered" });
+        showNotification("Great job! Order marked as delivered");
+    } catch (error) {
+        console.error("Error updating status:", error);
+        showNotification("Couldn't update the status right now", "error");
+    }
+}
+
+async function markOrderAsNotDelivered(orderId) {
+    try {
+        const orderRef = doc(db, "orders", orderId);
+        await updateDoc(orderRef, { status: "not_delivered" });
+        showNotification("Order marked as not delivered");
+    } catch (error) {
+        console.error("Error updating status:", error);
+        showNotification("Couldn't update the status right now", "error");
+    }
+}
+
+// Event delegation for button clicks
+deliveryList.addEventListener("click", (e) => {
+    const target = e.target;
+    if (target.classList.contains("delivered-btn")) {
+        const orderId = target.dataset.orderId;
+        if (orderId) markOrderAsDelivered(orderId);
+    } else if (target.classList.contains("not-delivered-btn")) {
+        const orderId = target.dataset.orderId;
+        if (orderId) markOrderAsNotDelivered(orderId);
+    }
+});
+
+// Immediate auth check with deliveryMapping
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        const isAuthorized = await isAuthorizedDeliveryUser(user.email);
+        if (isAuthorized) {
+            loadingScreen.style.display = "none";
+            loginSection.style.display = "none";
+            mainContent.classList.remove("hidden");
+            if (window.allowedHostels.length === 0) {
+                showNoHostelsNotification();
+            }
+            
+            // Initialize OneSignal after successful login
+            initializeOneSignal();
+            
+            loadDashboard();
+            loadOrders(s => s === "being_delivered", deliveryList, "No active deliveries.");
+            loadOrders(s => s === "delivered" || s === "not_delivered", deliveredList, "No completed deliveries.");
+        } else {
             await signOut(auth);
-            showNotification("You've been logged out. See you soon!");
-        });
+            loadingScreen.style.display = "none";
+            loginSection.style.display = "flex";
+            mainContent.classList.add("hidden");
+            showLoginNotification("This account is not authorized for the delivery portal", "error", "ban");
+        }
+    } else {
+        loadingScreen.style.display = "none";
+        loginSection.style.display = "flex";
+        mainContent.classList.add("hidden");
+    }
+});
 
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(regs => {
-                for (let reg of regs) reg.update();
-            });
+// Force update handler
+document.getElementById("force-update-btn").addEventListener("click", () => {
+    location.reload(true);
+});
+
+// Login handler with deliveryMapping check
+document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    const emailError = document.getElementById("email-error");
+    const passwordError = document.getElementById("password-error");
+    const loginBtn = document.getElementById("login-btn");
+    const spinner = loginBtn.querySelector(".loading-spinner");
+    const btnText = loginBtn.querySelector("span");
+
+    console.log("Login attempt with email:", email);
+    emailError.classList.remove("show");
+    passwordError.classList.remove("show");
+    document.getElementById("email").classList.remove("error");
+    document.getElementById("password").classList.remove("error");
+
+    if (!email) {
+        emailError.textContent = "Please enter your email";
+        emailError.classList.add("show");
+        document.getElementById("email").classList.add("error");
+        showLoginNotification("Please enter your email address", "error", "envelope");
+        return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        emailError.textContent = "This email address doesn't look right";
+        emailError.classList.add("show");
+        document.getElementById("email").classList.add("error");
+        showLoginNotification("Hmm, that doesn't look like a valid email", "error", "envelope");
+        return;
+    }
+    if (!password) {
+        passwordError.textContent = "Please enter your password";
+        passwordError.classList.add("show");
+        document.getElementById("password").classList.add("error");
+        showLoginNotification("Don't forget your password!", "error", "lock");
+        return;
+    }
+    if (password.length < 6) {
+        passwordError.textContent = "Your password needs to be at least 6 characters";
+        passwordError.classList.add("show");
+        document.getElementById("password").classList.add("error");
+        showLoginNotification("Your password is too short", "error", "lock");
+        return;
+    }
+
+    loginBtn.disabled = true;
+    btnText.textContent = "Logging in...";
+    spinner.classList.add("show");
+
+    try {
+        await signInWithEmailAndPassword(auth, email, password);
+        const isAuthorized = await isAuthorizedDeliveryUser(email);
+        if (!isAuthorized) {
+            await signOut(auth);
+            throw new Error("unauthorized");
+        }
+        loadingScreen.style.display = "none";
+        loginSection.style.display = "none";
+        mainContent.classList.remove("hidden");
+        showLoginNotification("Welcome back! You're logged in", "success", "check-circle");
+        if (window.allowedHostels.length === 0) {
+            showNoHostelsNotification();
+        }
+        
+        // Initialize OneSignal after successful login
+        initializeOneSignal();
+    } catch (error) {
+        console.error("Login error:", error.code, error.message);
+        let errorMessage = "Something went wrong. Let's try again.";
+        let icon = "exclamation-circle";
+
+        if (error.message === "unauthorized") {
+            errorMessage = "This account is not authorized for the delivery portal";
+            icon = "ban";
+        } else {
+            switch (error.code) {
+                case "auth/user-not-found":
+                    errorMessage = "We couldn't find an account with this email";
+                    icon = "user-times";
+                    break;
+                case "auth/wrong-password":
+                    errorMessage = "Oops! That password doesn't match our records";
+                    icon = "lock";
+                    break;
+                case "auth/too-many-requests":
+                    errorMessage = "Too many attempts. Please take a short break and try again";
+                    icon = "clock";
+                    break;
+                case "auth/network-request-failed":
+                    errorMessage = "Can't connect right now. Check your internet connection";
+                    icon = "wifi";
+                    break;
+                default:
+                    errorMessage = "Wrong password or email. Please try again.";
+                    break;
+            }
         }
 
-        // Navigation handlers
-        document.getElementById("dashboard-btn").addEventListener("click", () => { toggleSection("dashboard"); loadDashboard(); });
-        document.getElementById("delivery-btn").addEventListener("click", () => toggleSection("delivery"));
-        document.getElementById("delivered-btn").addEventListener("click", () => toggleSection("delivered"));
-        document.getElementById("settings-btn").addEventListener("click", () => toggleSection("settings"));
+        showLoginNotification(errorMessage, "error", icon);
+        document.getElementById("password").value = "";
+        document.getElementById("password").focus();
+    } finally {
+        loginBtn.disabled = false;
+        btnText.textContent = "Login";
+        spinner.classList.remove("show");
+    }
+});
 
-        // Ensure loading screen is visible
-        document.addEventListener("DOMContentLoaded", () => {});
+// Password visibility toggle
+document.querySelector(".password-toggle").addEventListener("click", function() {
+    const passwordInput = document.getElementById("password");
+    const icon = this.querySelector("i");
+    if (passwordInput.type === "password") {
+        passwordInput.type = "text";
+        icon.classList.remove("fa-eye");
+        icon.classList.add("fa-eye-slash");
+    } else {
+        passwordInput.type = "password";
+        icon.classList.remove("fa-eye-slash");
+        icon.classList.add("fa-eye");
+    }
+});
+
+// Auto-focus email field
+const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+        if (mutation.attributeName === "style" && loginSection.style.display === "flex") {
+            document.getElementById("email").focus();
+        }
+    });
+});
+observer.observe(loginSection, { attributes: true });
+
+// Handle Enter key for login
+document.getElementById("password").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+        document.getElementById("login-form").dispatchEvent(new Event("submit"));
+    }
+});
+
+// Logout handler
+document.getElementById("logout-btn").addEventListener("click", async () => {
+    await signOut(auth);
+    showNotification("You've been logged out. See you soon!");
+});
+
+// Add test notification button to settings
+const settingsSection = document.getElementById("settings");
+const testNotificationBtn = document.createElement("button");
+testNotificationBtn.id = "test-notification-btn";
+testNotificationBtn.className = "btn";
+testNotificationBtn.style.marginTop = "20px";
+testNotificationBtn.textContent = "Test Notification";
+testNotificationBtn.addEventListener("click", () => {
+    // First try to request notification permission if needed
+    if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                showNotification("Notifications enabled!", "success", "bell");
+            }
+        });
+    }
+    
+    // Test browser notification
+    if (Notification.permission === "granted") {
+        new Notification("Test Notification", {
+            body: "This is a test notification from Chawp Delivery",
+            icon: "/favicon.ico"
+        });
+    }
+    
+    // Show in-app notification
+    showNotification("Test notification sent!", "success", "bell");
+    
+    // Play notification sound
+    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+    audio.play().catch(e => console.log("Audio play failed:", e));
+});
+
+// Insert after Force Update button
+const forceUpdateBtn = document.getElementById("force-update-btn");
+if (forceUpdateBtn && settingsSection) {
+    settingsSection.insertBefore(testNotificationBtn, forceUpdateBtn.nextSibling);
+    settingsSection.insertBefore(document.createElement("br"), testNotificationBtn.nextSibling);
+}
+
+// Request notification permissions when visiting the site
+document.addEventListener("DOMContentLoaded", () => {
+    if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+        setTimeout(() => {
+            Notification.requestPermission();
+        }, 5000);
+    }
+});
+
+// Navigation handlers
+document.getElementById("dashboard-btn").addEventListener("click", () => { toggleSection("dashboard"); loadDashboard(); });
+document.getElementById("delivery-btn").addEventListener("click", () => toggleSection("delivery"));
+document.getElementById("delivered-btn").addEventListener("click", () => toggleSection("delivered"));
+document.getElementById("settings-btn").addEventListener("click", () => toggleSection("settings"));
+
+// Ensure loading screen is visible
+document.addEventListener("DOMContentLoaded", () => {});
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+        for (let reg of regs) reg.update();
+    });
+}
     </script>
     
     <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'92b388da784db063',t:'MTc0Mzc5ODMyMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
