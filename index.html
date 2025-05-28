@@ -1215,9 +1215,38 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // Force update handler
-document.getElementById("force-update-btn").addEventListener("click", () => {
+document.getElementById("force-update-btn").addEventListener("click", async () => {
+  try {
+    // Clear cache
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map(name => caches.delete(name)));
+
+    // Unregister all service workers
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (let reg of regs) {
+        await reg.unregister();
+      }
+    }
+
+    // Clear localStorage, sessionStorage
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // Clear OneSignal subscription
+    if (window.OneSignal) {
+      OneSignal.removeExternalUserId();
+      OneSignal.setSubscription(false);
+    }
+
+    alert("Cleared all site data. Reloading to apply fresh OneSignal registration.");
     location.reload(true);
+  } catch (err) {
+    console.error("Error clearing data:", err);
+    alert("Error during force update.");
+  }
 });
+
 
 // Login handler with deliveryMapping check
 document.getElementById("login-form").addEventListener("submit", async (e) => {
