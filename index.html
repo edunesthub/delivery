@@ -992,50 +992,19 @@ async function loadOrders(statusFilter, targetElement, emptyMessage) {
             const newActiveDeliveryIds = new Set();
             const newDeliveries = [];
             
-            const currentUserEmail = auth.currentUser.email;
-
-const orders = snapshot.docs
-    .map(doc => ({ id: doc.id, ...doc.data() }))
-    .filter(order => {
-        return statusFilter(order.status) &&
-               order.deliveryDetails &&
-               order.deliveryDetails.hostel &&
-               window.allowedHostels.includes(order.deliveryDetails.hostel);
-    })
-    .sort((a, b) => {
-        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-        return timeA - timeB;
-    });
-
-// Get deliveryMapping for all delivery accounts
-const deliveryMappingsSnapshot = await getDoc(doc(db, "deliveryMapping", currentUserEmail));
-const allMappingsQuery = query(collection(db, "deliveryMapping"));
-const allMappingsSnap = await getDocs(allMappingsQuery);
-
-const hostelAssignments = {};
-
-// Create hostel -> list of users map
-allMappingsSnap.forEach(docSnap => {
-    const data = docSnap.data();
-    if (data.isDelivery && data.allowedHostels) {
-        data.allowedHostels.forEach(hostel => {
-            if (!hostelAssignments[hostel]) hostelAssignments[hostel] = [];
-            hostelAssignments[hostel].push(docSnap.id);
-        });
-    }
-});
-
-// Keep only the orders assigned to the current user
-const filteredOrders = orders.filter((order, index) => {
-    const hostel = order.deliveryDetails.hostel;
-    const assignedEmails = hostelAssignments[hostel];
-    if (!assignedEmails || !assignedEmails.includes(currentUserEmail)) return false;
-
-    // Round-robin: decide if current user should take this order
-    const assignedIndex = index % assignedEmails.length;
-    return assignedEmails[assignedIndex] === currentUserEmail;
-});
+            const orders = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter(order => {
+                    return statusFilter(order.status) && 
+                           order.deliveryDetails && 
+                           order.deliveryDetails.hostel && 
+                           window.allowedHostels.includes(order.deliveryDetails.hostel);
+                })
+                .sort((a, b) => {
+                    const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+                    const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+                    return timeA - timeB; // Ascending order for oldest first
+                });
 
             // For active deliveries, check for new ones
             if (statusFilter("being_delivered")) {
@@ -1097,7 +1066,7 @@ const filteredOrders = orders.filter((order, index) => {
             }
 
             targetElement.innerHTML = ''; // Clear existing content
-           for (const order of filteredOrders) {
+            for (const order of orders) {
                 const items = order.items?.map(item => `${item.quantity}x ${item.name}`).join(", ") || "No items";
                 const deliveryDetails = order.deliveryDetails || {};
                 const statusText = order.status === "delivered" ? "Delivered" : order.status === "not_delivered" ? "Not Delivered" : "In Transit";
@@ -1215,38 +1184,9 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // Force update handler
-document.getElementById("force-update-btn").addEventListener("click", async () => {
-  try {
-    // Clear cache
-    const cacheNames = await caches.keys();
-    await Promise.all(cacheNames.map(name => caches.delete(name)));
-
-    // Unregister all service workers
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      for (let reg of regs) {
-        await reg.unregister();
-      }
-    }
-
-    // Clear localStorage, sessionStorage
-    localStorage.clear();
-    sessionStorage.clear();
-
-    // Clear OneSignal subscription
-    if (window.OneSignal) {
-      OneSignal.removeExternalUserId();
-      OneSignal.setSubscription(false);
-    }
-
-    alert("Cleared all site data. Reloading to apply fresh OneSignal registration.");
+document.getElementById("force-update-btn").addEventListener("click", () => {
     location.reload(true);
-  } catch (err) {
-    console.error("Error clearing data:", err);
-    alert("Error during force update.");
-  }
 });
-
 
 // Login handler with deliveryMapping check
 document.getElementById("login-form").addEventListener("submit", async (e) => {
