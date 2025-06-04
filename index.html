@@ -1067,10 +1067,20 @@ async function loadOrders(statusFilter, targetElement, emptyMessage) {
 
             targetElement.innerHTML = ''; // Clear existing content
             for (const order of orders) {
-                const items = order.items?.map(item => `${item.quantity}x ${item.name}`).join(", ") || "No items";
+const itemsList = (order.cart || order.items || []);
+const mergedItemsMap = {};
+itemsList.forEach(item => {
+  if (mergedItemsMap[item.name]) {
+    mergedItemsMap[item.name] += item.quantity;
+  } else {
+    mergedItemsMap[item.name] = item.quantity;
+  }
+});
+const mergedItems = Object.entries(mergedItemsMap).map(([name, qty]) => `${qty}x ${name}`).join("<br>");
                 const deliveryDetails = order.deliveryDetails || {};
                 const statusText = order.status === "delivered" ? "Delivered" : order.status === "not_delivered" ? "Not Delivered" : "In Transit";
                 const statusClass = order.status === "delivered" ? "status" : order.status === "not_delivered" ? "status not-delivered" : "status";
+const orderTime = (order.timestamp?.toDate ? order.timestamp.toDate() : new Date(order.timestamp)).toLocaleString();
 
                 let restaurantName = order.restaurantName || "Unknown Restaurant";
                 if (order.restaurantId && !order.restaurantName) {
@@ -1091,8 +1101,8 @@ async function loadOrders(statusFilter, targetElement, emptyMessage) {
                     <p style="font-size: 1.2rem; font-weight: 600;"><strong>Restaurant:</strong> ${restaurantName}</p><hr>
                     <p style="font-size: 1.2rem; font-weight: 600;"><strong>Hostel:</strong> ${deliveryDetails.hostel || "N/A"}&nbsp; <strong>Room:</strong> ${deliveryDetails.location || "N/A"}</p>
                     <p style="font-size: 1.2rem; font-weight: 600;"><strong>Contact:</strong> ${deliveryDetails.contactNumber || "N/A"}</p>
-                    <p style="font-size: 1.2rem; font-weight: 600;"><strong>Items:</strong> ${items}</p>
-                    <p><strong>Time:</strong> ${order.timestamp ? new Date(order.timestamp).toLocaleString() : "N/A"}</p>
+                    <p style="font-size: 1.2rem; font-weight: 600;"><strong>Items:</strong> ${mergedItems}</p>
+                    <p><strong>Time:</strong> ${orderTime ? new Date(orderTime).toLocaleString() : "N/A"}</p>
                     ${order.status === "being_delivered" ? "" : `<p><strong>ID:</strong> ${order.id}</p>`}
                     <p><strong>Status:</strong> <span class="${statusClass}">${statusText}</span></p>
                     ${order.status === "being_delivered" ? `
